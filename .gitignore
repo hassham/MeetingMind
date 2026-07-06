@@ -1,10 +1,18 @@
-# Node / React
-node_modules/
-frontend/**/build/
-frontend/**/.env
+## Visual Studio build output
+**/[Bb]in/
+**/[Oo]bj/
+.vs/
 
-# Local storage / secrets
+## Rider / VS Code
+.idea/
+*.user
+
+## Node / React
+**/node_modules/
+frontend/meetingmind-ui/dist/
+frontend/meetingmind-ui/.env
+
+## Local storage / secrets
 Storage/
 .env
 appsettings.Development.json
-.vs/

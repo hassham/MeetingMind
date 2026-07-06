@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\MeetingMind.Api.props" />
-</Project>
