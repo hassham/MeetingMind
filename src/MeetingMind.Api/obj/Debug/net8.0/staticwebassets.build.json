@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "tA5A+01tXoIWT4jkNbVc8u9qNftC46kkHa6ySvJ1I5Q=",
+  "Source": "MeetingMind.Api",
+  "BasePath": "_content/MeetingMind.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

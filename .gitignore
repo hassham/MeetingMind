@@ -1,0 +1,10 @@
+# Node / React
+node_modules/
+frontend/**/build/
+frontend/**/.env
+
+# Local storage / secrets
+Storage/
+.env
+appsettings.Development.json
+.vs/

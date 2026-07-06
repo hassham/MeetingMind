@@ -1,0 +1,17 @@
+services:
+    meetingmind-postgres:
+        image: postgres:16
+        container_name: meetingmind-postgres
+        restart: always
+        environment:
+            POSTGRES_DB: meetingmind
+            POSTGRES_USER: meetingmind_user
+            POSTGRES_PASSWORD: meetingmind_password
+        ports:
+            - "5432:5432"
+        volumes:
+            - meetingmind_postgres_data:/var/lib/postgresql/data
+    
+volumes:
+    meetingmind_postgres_data:
+        
