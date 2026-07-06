@@ -38,30 +38,36 @@ Last verified against code: 2026-07-06.
       Status: DONE.
 - [x] API has basic health endpoints: `/health` and `/health/db`.
       Status: DONE.
-- [ ] API still has default `/weatherforecast` endpoint.
-      Status: TODO cleanup.
-- [ ] Domain/Application/Infrastructure/Shared still contain template
+- [x] API still has default `/weatherforecast` endpoint.
+      Status: DONE cleanup.
+      Notes: Removed the default template endpoint and `WeatherForecast` record.
+- [x] Domain/Application/Infrastructure/Shared still contain template
       `Class1.cs` placeholder files.
-      Status: TODO cleanup once real types are added.
-- [ ] `MeetingMindDbContext` exists and is registered in `Program.cs`.
-      Status: PARTIAL.
-      Notes: The DbContext has no `DbSet`s because the domain entities do not
-      exist yet.
-- [ ] EF provider dependency for API compile-time `UseNpgsql` is present.
+      Status: DONE cleanup.
+      Notes: Removed placeholders after adding real domain entities/enums.
+- [x] `MeetingMindDbContext` exists and is registered in `Program.cs`.
       Status: DONE.
-- [ ] EF package versions should be reviewed/aligned before migrations.
-      Status: TODO.
-      Notes: API references `Npgsql.EntityFrameworkCore.PostgreSQL` 9.0.4;
-      Infrastructure references `Microsoft.EntityFrameworkCore` 9.0.17.
-- [ ] React frontend skeleton exists under `frontend/meetingmind-ui`.
-      Status: PARTIAL.
-      Notes: It is still the default Vite starter screen, not MeetingMind UI.
+      Notes: DbContext now exposes `MeetingJobs`, `MeetingTranscripts`, and
+      `MeetingMinutes` DbSets with initial EF model configuration.
+- [x] EF provider dependency for API compile-time `UseNpgsql` is present.
+      Status: DONE.
+- [x] EF package versions should be reviewed/aligned before migrations.
+      Status: DONE.
+      Notes: Infrastructure `Microsoft.EntityFrameworkCore` is aligned to
+      9.0.4 to match the API's `Npgsql.EntityFrameworkCore.PostgreSQL` 9.0.4.
+- [x] React frontend skeleton exists under `frontend/meetingmind-ui`.
+      Status: DONE.
+      Notes: Replaced the default Vite starter screen with a MeetingMind UI
+      shell.
 - [ ] Frontend dependencies are incomplete for the documented stack.
-      Status: TODO.
-      Notes: React is installed, but Material UI and Axios are not currently in
-      `package.json`.
-- [ ] Tests are not scaffolded.
-      Status: TODO.
+      Status: PARTIAL.
+      Notes: `package.json` now lists Material UI, Emotion, MUI icons, and
+      Axios. `npm` is not available on PATH in the current shell, so
+      `package-lock.json` and `node_modules` still need `npm install`.
+- [x] Tests are not scaffolded.
+      Status: DONE.
+      Notes: Added `tests/MeetingMind.Domain.Tests` and included it in
+      `MeetingMind.sln`.
 
 ## Core pipeline (FR-001 to FR-010, see docs/FSD.md)
 
@@ -98,12 +104,12 @@ Last verified against code: 2026-07-06.
       Notes: `Shared` and `Worker` are also present.
 - [x] PostgreSQL via Docker.
       Status: DONE.
-- [ ] Domain entities and enums: `MeetingJob`, `MeetingTranscript`,
+- [x] Domain entities and enums: `MeetingJob`, `MeetingTranscript`,
       `MeetingMinutes`, `MeetingJobStatus`, `MeetingJobStage`.
-      Status: TODO.
-- [ ] EF Core mappings and `DbSet`s for `MeetingJob`, `MeetingTranscript`,
+      Status: DONE.
+- [x] EF Core mappings and `DbSet`s for `MeetingJob`, `MeetingTranscript`,
       `MeetingMinutes`.
-      Status: TODO.
+      Status: DONE.
 - [ ] EF Core migrations.
       Status: TODO.
 - [ ] Repository pattern / persistence abstractions.
@@ -131,15 +137,17 @@ Last verified against code: 2026-07-06.
       Notes: Implement with Hangfire.
 - [ ] Upload/status/result/retry/download API endpoints.
       Status: TODO.
-- [ ] Remove placeholder weather endpoint and template classes.
-      Status: TODO.
+- [x] Remove placeholder weather endpoint and template classes.
+      Status: DONE.
 
 ## Frontend
 
-- [ ] Replace Vite starter screen with MeetingMind application shell.
-      Status: TODO.
+- [x] Replace Vite starter screen with MeetingMind application shell.
+      Status: DONE.
 - [ ] Install/add documented frontend stack dependencies: Material UI and Axios.
-      Status: TODO.
+      Status: PARTIAL.
+      Notes: Dependencies are listed in `package.json`; run `npm install` once
+      Node/npm is available to update `package-lock.json` and install packages.
 - [ ] Upload UI.
       Status: TODO.
 - [ ] Progress polling / status display.

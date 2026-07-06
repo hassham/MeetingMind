@@ -1,6 +1,6 @@
 @MeetingMind.Api_HostAddress = http://localhost:5059
 
-GET {{MeetingMind.Api_HostAddress}}/weatherforecast/
+GET {{MeetingMind.Api_HostAddress}}/health
 Accept: application/json
 
 ###

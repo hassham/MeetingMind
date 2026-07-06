@@ -19,8 +19,16 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MeetingMind.Shared", "src\M
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{53051C35-2141-4AAC-927D-6DBAF6F1834A}"
 	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		AGENTS.md = AGENTS.md
+		BACKLOG.md = BACKLOG.md
 		docker-compose.yml = docker-compose.yml
+		README.md = README.md
 	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{1879D5C9-5CA9-4A88-937B-6E0ED54C3DE0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MeetingMind.Domain.Tests", "tests\MeetingMind.Domain.Tests\MeetingMind.Domain.Tests.csproj", "{262BE75A-4EFB-42DA-8680-CC4ABCABCDC6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -52,6 +60,10 @@ Global
 		{029D0EA0-E444-44B1-8886-36C835AB3314}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{029D0EA0-E444-44B1-8886-36C835AB3314}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{029D0EA0-E444-44B1-8886-36C835AB3314}.Release|Any CPU.Build.0 = Release|Any CPU
+		{262BE75A-4EFB-42DA-8680-CC4ABCABCDC6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{262BE75A-4EFB-42DA-8680-CC4ABCABCDC6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{262BE75A-4EFB-42DA-8680-CC4ABCABCDC6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{262BE75A-4EFB-42DA-8680-CC4ABCABCDC6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -63,6 +75,7 @@ Global
 		{5386DEDE-2368-493D-A770-5BCE8C6BD084} = {E2AD5780-4083-4B98-A927-8471DF1A4FC7}
 		{0E4AE476-A118-4666-A29B-9F8DEB426C68} = {E2AD5780-4083-4B98-A927-8471DF1A4FC7}
 		{029D0EA0-E444-44B1-8886-36C835AB3314} = {E2AD5780-4083-4B98-A927-8471DF1A4FC7}
+		{262BE75A-4EFB-42DA-8680-CC4ABCABCDC6} = {1879D5C9-5CA9-4A88-937B-6E0ED54C3DE0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A09806D8-0DA2-4891-A3DF-156CF964A57F}
