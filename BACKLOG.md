@@ -11,16 +11,17 @@ Last verified against code: 2026-07-06.
 
 ## Current focus
 
-- [x] Decide queue technology: Hangfire vs MSMQ vs SQLite-backed queue.
+- [x] Phase 3 - Local storage and upload job creation.
       Status: DONE.
-      Notes: Decision recorded 2026-07-06. Use Hangfire for queueing,
-      background job execution, retries, and workflow orchestration.
-- [x] Decouple the synchronous `ffmpeg -> transcription -> minutes` chain into
-      distinct queued stages to resolve API timeout errors.
-      Status: DONE for planning/decision.
-      Notes: Unblocked by Hangfire decision. Implementation is tracked under
-      FR-003 and Phases 4-8. Transcription will use Whisper; meeting-minutes
-      generation will use OpenAI GPT.
+      Notes: Added storage options, local file storage, upload use case, and
+      `POST /api/meetings/upload`. Upload saves the original file, creates a
+      queued `MeetingJob`, and returns `jobId` immediately. No Hangfire enqueue
+      yet.
+- [ ] Phase 4 - Hangfire background job integration.
+      Status: TODO.
+      Notes: Next active focus. Add Hangfire packages/configuration, implement
+      `IBackgroundJobService`, and enqueue jobs from upload while keeping
+      processing steps stubbed.
 
 ## Verified current scaffold
 
@@ -71,11 +72,16 @@ Last verified against code: 2026-07-06.
 
 ## Core pipeline (FR-001 to FR-010, see docs/FSD.md)
 
-- [ ] FR-001 Upload meeting: MP3/WAV/M4A/AAC, configurable max size.
-      Status: TODO.
+- [x] FR-001 Upload meeting: MP3/WAV/M4A/AAC, configurable max size.
+      Status: DONE for backend API.
+      Notes: `POST /api/meetings/upload` validates extension, MIME type, file
+      size, and file name before saving the original file.
 - [ ] FR-002 Create processing job: save file, DB record, job ID, enqueue,
       return immediately.
-      Status: TODO.
+      Status: PARTIAL.
+      Notes: File save, DB record, job ID, queued status, uploaded stage, and
+      immediate response are implemented. Enqueue is intentionally deferred to
+      Phase 4.
 - [ ] FR-003 Background processing pipeline: validate -> transcode ->
       transcript -> clean -> minutes -> save -> complete.
       Status: TODO.
@@ -110,14 +116,18 @@ Last verified against code: 2026-07-06.
 - [x] EF Core mappings and `DbSet`s for `MeetingJob`, `MeetingTranscript`,
       `MeetingMinutes`.
       Status: DONE.
-- [ ] EF Core migrations.
-      Status: TODO.
+- [x] EF Core migrations.
+      Status: DONE.
+      Notes: Added initial PostgreSQL migration under
+      `src/MeetingMind.Infrastructure/Persistence/Migrations`.
 - [ ] Repository pattern / persistence abstractions.
-      Status: TODO.
-- [ ] `IFileStorageService` interface.
-      Status: TODO.
-- [ ] Local `IFileStorageService` implementation.
-      Status: TODO.
+      Status: PARTIAL.
+      Notes: Added `IMeetingJobRepository` for upload job creation. Broader
+      persistence abstractions can be added as future use cases need them.
+- [x] `IFileStorageService` interface.
+      Status: DONE.
+- [x] Local `IFileStorageService` implementation.
+      Status: DONE.
 - [ ] `IAudioProcessingService` interface.
       Status: TODO.
 - [ ] FFmpeg `IAudioProcessingService` implementation.
@@ -136,7 +146,9 @@ Last verified against code: 2026-07-06.
       Status: TODO.
       Notes: Implement with Hangfire.
 - [ ] Upload/status/result/retry/download API endpoints.
-      Status: TODO.
+      Status: PARTIAL.
+      Notes: Upload endpoint exists. Status, result, retry, and download
+      endpoints remain TODO.
 - [x] Remove placeholder weather endpoint and template classes.
       Status: DONE.
 
@@ -174,10 +186,11 @@ Last verified against code: 2026-07-06.
 - [ ] Long-transcript chunking / hierarchical summarization.
       Status: TODO design later.
       Notes: Identified as a PRD risk and needed before testing long meetings.
-- [ ] Local storage folder structure is not created/configured yet.
-      Status: TODO.
+- [x] Local storage folder structure is not created/configured yet.
+      Status: DONE.
       Expected: `Storage/Audio/Original`, `Storage/Audio/Processed`,
       `Storage/Transcript`, `Storage/Minutes`.
+      Notes: Folders are configured and created by `LocalFileStorageService`.
 - [ ] Secrets/configuration strategy is incomplete.
       Status: TODO.
       Notes: OpenAI settings, storage settings, processing retry settings, and
@@ -255,3 +268,9 @@ backlog before continuing to the next phase.
 - [x] Solution scaffold created - verified 2026-07-06.
 - [x] Docker PostgreSQL service added - verified 2026-07-06.
 - [x] API `UseNpgsql` dependency issue fixed - verified 2026-07-06.
+- [x] Queue technology decided: Hangfire - done 2026-07-06.
+- [x] Processing decoupling plan unblocked by Hangfire decision - done 2026-07-06.
+- [x] Removed default `/weatherforecast` endpoint and template classes - done 2026-07-06.
+- [x] Added domain entities/enums and DbContext DbSets/mappings - done 2026-07-06.
+- [x] Added initial EF Core PostgreSQL migration - done 2026-07-06.
+- [x] Added local storage and backend upload job creation - done 2026-07-06.
