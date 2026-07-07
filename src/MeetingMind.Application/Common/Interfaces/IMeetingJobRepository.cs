@@ -1,8 +1,19 @@
 using MeetingMind.Domain.Entities;
+using MeetingMind.Domain.Enums;
 
 namespace MeetingMind.Application.Common.Interfaces;
 
 public interface IMeetingJobRepository
 {
     Task AddAsync(MeetingJob meetingJob, CancellationToken cancellationToken);
+
+    Task SetHangfireJobIdAsync(Guid meetingJobId, string hangfireJobId, CancellationToken cancellationToken);
+
+    Task UpdateStatusAsync(
+        Guid meetingJobId,
+        MeetingJobStatus status,
+        MeetingJobStage stage,
+        int progress,
+        string? errorMessage,
+        CancellationToken cancellationToken);
 }

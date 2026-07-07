@@ -18,15 +18,18 @@ public class UploadMeetingService : IUploadMeetingService
         };
 
     private readonly IFileStorageService _fileStorageService;
+    private readonly IBackgroundJobService _backgroundJobService;
     private readonly IMeetingJobRepository _meetingJobRepository;
     private readonly StorageOptions _storageOptions;
 
     public UploadMeetingService(
         IFileStorageService fileStorageService,
+        IBackgroundJobService backgroundJobService,
         IMeetingJobRepository meetingJobRepository,
         StorageOptions storageOptions)
     {
         _fileStorageService = fileStorageService;
+        _backgroundJobService = backgroundJobService;
         _meetingJobRepository = meetingJobRepository;
         _storageOptions = storageOptions;
     }
@@ -56,6 +59,9 @@ public class UploadMeetingService : IUploadMeetingService
         };
 
         await _meetingJobRepository.AddAsync(meetingJob, cancellationToken);
+
+        var hangfireJobId = _backgroundJobService.EnqueueMeetingProcessing(meetingJob.Id);
+        await _meetingJobRepository.SetHangfireJobIdAsync(meetingJob.Id, hangfireJobId, cancellationToken);
 
         return new UploadMeetingResult(meetingJob.Id, meetingJob.Status, meetingJob.Stage);
     }

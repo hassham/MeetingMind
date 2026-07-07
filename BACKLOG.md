@@ -17,11 +17,22 @@ Last verified against code: 2026-07-06.
       `POST /api/meetings/upload`. Upload saves the original file, creates a
       queued `MeetingJob`, and returns `jobId` immediately. No Hangfire enqueue
       yet.
-- [ ] Phase 4 - Hangfire background job integration.
+- [x] Refactor API endpoints from Minimal APIs into controllers.
+      Status: DONE.
+      Notes: Move `/health`, `/health/db`, and `/api/meetings/upload` out of
+      `Program.cs` into controller classes under `MeetingMind.Api/Controllers`.
+      Keep `Program.cs` for service registration, middleware, Swagger, HTTPS,
+      and `MapControllers()` only. Do this before adding more meeting endpoints.
+- [x] Phase 4 - Hangfire background job integration.
+      Status: DONE.
+      Notes: Added Hangfire PostgreSQL storage, API dashboard at `/hangfire`,
+      Worker Hangfire server, `IBackgroundJobService`, upload enqueueing, and a
+      stub `MeetingProcessingJob` that marks jobs Processing then Failed with
+      "Processing not yet implemented".
+- [ ] Phase 5 - Background job shell and status tracking.
       Status: TODO.
-      Notes: Next active focus. Add Hangfire packages/configuration, implement
-      `IBackgroundJobService`, and enqueue jobs from upload while keeping
-      processing steps stubbed.
+      Notes: Next active focus. Add status polling endpoint and verify queued,
+      processing, failed/completed state can be observed through the API.
 
 ## Verified current scaffold
 
@@ -76,16 +87,17 @@ Last verified against code: 2026-07-06.
       Status: DONE for backend API.
       Notes: `POST /api/meetings/upload` validates extension, MIME type, file
       size, and file name before saving the original file.
-- [ ] FR-002 Create processing job: save file, DB record, job ID, enqueue,
+- [x] FR-002 Create processing job: save file, DB record, job ID, enqueue,
       return immediately.
-      Status: PARTIAL.
-      Notes: File save, DB record, job ID, queued status, uploaded stage, and
-      immediate response are implemented. Enqueue is intentionally deferred to
-      Phase 4.
+      Status: DONE.
+      Notes: Upload saves the file, creates a queued DB record, enqueues a
+      Hangfire job, stores `HangfireJobId`, and returns `jobId` immediately.
 - [ ] FR-003 Background processing pipeline: validate -> transcode ->
       transcript -> clean -> minutes -> save -> complete.
-      Status: TODO.
-      Notes: Use Hangfire to execute the workflow asynchronously.
+      Status: PARTIAL.
+      Notes: Hangfire now executes a stub job and updates status. Actual
+      validation, FFmpeg, Whisper, transcript cleanup, GPT, and save-result
+      stages remain for later phases.
 - [ ] FR-004 Job status tracking: status, progress %, stage, error message,
       duration.
       Status: TODO.
@@ -128,6 +140,10 @@ Last verified against code: 2026-07-06.
       Status: DONE.
 - [x] Local `IFileStorageService` implementation.
       Status: DONE.
+- [x] API controller structure.
+      Status: DONE.
+      Notes: Replace endpoint mappings in `Program.cs` with controllers:
+      `HealthController` and `MeetingsController`.
 - [ ] `IAudioProcessingService` interface.
       Status: TODO.
 - [ ] FFmpeg `IAudioProcessingService` implementation.
@@ -140,11 +156,11 @@ Last verified against code: 2026-07-06.
       Status: TODO.
 - [ ] GPT `IMeetingMinutesService` implementation with structured JSON output.
       Status: TODO.
-- [ ] `IBackgroundJobService` interface.
-      Status: TODO.
-- [ ] `IBackgroundJobService` implementation.
-      Status: TODO.
-      Notes: Implement with Hangfire.
+- [x] `IBackgroundJobService` interface.
+      Status: DONE.
+- [x] `IBackgroundJobService` implementation.
+      Status: DONE.
+      Notes: Implemented with Hangfire.
 - [ ] Upload/status/result/retry/download API endpoints.
       Status: PARTIAL.
       Notes: Upload endpoint exists. Status, result, retry, and download
@@ -274,3 +290,5 @@ backlog before continuing to the next phase.
 - [x] Added domain entities/enums and DbContext DbSets/mappings - done 2026-07-06.
 - [x] Added initial EF Core PostgreSQL migration - done 2026-07-06.
 - [x] Added local storage and backend upload job creation - done 2026-07-06.
+- [x] Refactored API endpoints into controllers - done 2026-07-07.
+- [x] Added Hangfire PostgreSQL enqueue/server/dashboard integration - done 2026-07-07.
