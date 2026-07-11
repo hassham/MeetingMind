@@ -11,6 +11,8 @@ public interface IMeetingJobRepository
 
     Task SetHangfireJobIdAsync(Guid meetingJobId, string hangfireJobId, CancellationToken cancellationToken);
 
+    Task SetProcessedFilePathAsync(Guid meetingJobId, string processedFilePath, CancellationToken cancellationToken);
+
     Task UpdateStatusAsync(
         Guid meetingJobId,
         MeetingJobStatus status,

@@ -2,6 +2,7 @@
 **/[Bb]in/
 **/[Oo]bj/
 .vs/
+**/artifacts/test
 
 ## Rider / VS Code
 .idea/

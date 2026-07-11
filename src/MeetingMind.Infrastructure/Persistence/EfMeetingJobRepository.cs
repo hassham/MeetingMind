@@ -39,6 +39,18 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task SetProcessedFilePathAsync(
+        Guid meetingJobId,
+        string processedFilePath,
+        CancellationToken cancellationToken)
+    {
+        var meetingJob = await GetMeetingJobAsync(meetingJobId, cancellationToken);
+        meetingJob.ProcessedFilePath = processedFilePath;
+        meetingJob.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task UpdateStatusAsync(
         Guid meetingJobId,
         MeetingJobStatus status,

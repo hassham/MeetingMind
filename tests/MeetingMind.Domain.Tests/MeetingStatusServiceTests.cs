@@ -63,6 +63,14 @@ public class MeetingStatusServiceTests
             throw new NotSupportedException();
         }
 
+        public Task SetProcessedFilePathAsync(
+            Guid meetingJobId,
+            string processedFilePath,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
         public Task UpdateStatusAsync(
             Guid meetingJobId,
             MeetingJobStatus status,

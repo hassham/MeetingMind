@@ -34,10 +34,16 @@ Last verified against code: 2026-07-11.
       Notes: Added `GET /api/meetings/{jobId}/status`, status query service,
       repository read support, configurable Worker stub delay, and focused
       status mapping tests.
-- [ ] Phase 6 - FFmpeg audio processing.
+- [x] Phase 6 - FFmpeg audio processing.
+      Status: DONE.
+      Notes: Added `IAudioProcessingService`, FFmpeg-backed MP3 transcoding via
+      `FFMpegCore`, Worker validation/transcoding status updates, processed
+      file path persistence, and a clear Phase 7 boundary failure message:
+      "Transcription not yet implemented".
+- [ ] Phase 7 - Transcription integration.
       Status: TODO.
-      Notes: Next active focus. Add `IAudioProcessingService` and FFmpeg-backed
-      validation/transcoding, without Whisper or GPT work.
+      Notes: Next active focus. Add Whisper transcription behind
+      `ITranscriptionService`; do not add GPT minutes generation yet.
 
 ## Verified current scaffold
 
@@ -100,16 +106,18 @@ Last verified against code: 2026-07-11.
 - [ ] FR-003 Background processing pipeline: validate -> transcode ->
       transcript -> clean -> minutes -> save -> complete.
       Status: PARTIAL.
-      Notes: Hangfire now executes a stub job and updates status. Actual
-      validation, FFmpeg, Whisper, transcript cleanup, GPT, and save-result
-      stages remain for later phases.
+      Notes: Hangfire now executes the Worker flow through upload, validation,
+      FFmpeg MP3 transcoding, and processed path persistence. Whisper,
+      transcript cleanup, GPT, and save-result stages remain for later phases.
 - [ ] FR-004 Job status tracking: status, progress %, stage, error message,
       duration.
       Status: PARTIAL.
       Notes: `GET /api/meetings/{jobId}/status` exposes job ID, status, stage,
       progress, and error message. Explicit duration is not exposed yet.
-- [ ] FR-005 Audio transcoding via FFmpeg.
-      Status: TODO.
+- [x] FR-005 Audio transcoding via FFmpeg.
+      Status: DONE.
+      Notes: Worker converts uploaded audio to normalized mono MP3 through
+      `IAudioProcessingService` and saves `ProcessedFilePath`.
 - [ ] FR-006 Transcription via Whisper API.
       Status: TODO.
 - [ ] FR-007 Meeting minutes generation via GPT: title, summary, attendees,
@@ -141,8 +149,10 @@ Last verified against code: 2026-07-11.
       `src/MeetingMind.Infrastructure/Persistence/Migrations`.
 - [ ] Repository pattern / persistence abstractions.
       Status: PARTIAL.
-      Notes: Added `IMeetingJobRepository` for upload job creation. Broader
-      persistence abstractions can be added as future use cases need them.
+      Notes: Added `IMeetingJobRepository` for upload job creation, status
+      updates, Hangfire job ID updates, reads, and processed file path
+      persistence. Broader persistence abstractions can be added as future use
+      cases need them.
 - [x] `IFileStorageService` interface.
       Status: DONE.
 - [x] Local `IFileStorageService` implementation.
@@ -151,10 +161,12 @@ Last verified against code: 2026-07-11.
       Status: DONE.
       Notes: Replace endpoint mappings in `Program.cs` with controllers:
       `HealthController` and `MeetingsController`.
-- [ ] `IAudioProcessingService` interface.
-      Status: TODO.
-- [ ] FFmpeg `IAudioProcessingService` implementation.
-      Status: TODO.
+- [x] `IAudioProcessingService` interface.
+      Status: DONE.
+- [x] FFmpeg `IAudioProcessingService` implementation.
+      Status: DONE.
+      Notes: Implemented with `FFMpegCore`; FFmpeg binaries must be available
+      on PATH or configured via `AudioProcessing:FfmpegBinaryFolder`.
 - [ ] `ITranscriptionService` interface.
       Status: TODO.
 - [ ] Whisper `ITranscriptionService` implementation.
@@ -216,8 +228,9 @@ Last verified against code: 2026-07-11.
       Notes: Folders are configured and created by `LocalFileStorageService`.
 - [ ] Secrets/configuration strategy is incomplete.
       Status: TODO.
-      Notes: OpenAI settings, storage settings, processing retry settings, and
-      max upload size are not present yet.
+      Notes: Storage, max upload size, and audio processing settings are
+      present. OpenAI settings and processing retry settings are not present
+      yet.
 
 ## Proposed phase plan
 

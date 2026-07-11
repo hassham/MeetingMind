@@ -23,12 +23,14 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		AGENTS.md = AGENTS.md
 		BACKLOG.md = BACKLOG.md
 		docker-compose.yml = docker-compose.yml
+		QUESTIONS_phase6_ffmpeg_audio_processing.md = QUESTIONS_phase6_ffmpeg_audio_processing.md
 		README.md = README.md
+		WORKFLOW.md = WORKFLOW.md
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{1879D5C9-5CA9-4A88-937B-6E0ED54C3DE0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MeetingMind.Domain.Tests", "tests\MeetingMind.Domain.Tests\MeetingMind.Domain.Tests.csproj", "{262BE75A-4EFB-42DA-8680-CC4ABCABCDC6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MeetingMind.Domain.Tests", "tests\MeetingMind.Domain.Tests\MeetingMind.Domain.Tests.csproj", "{262BE75A-4EFB-42DA-8680-CC4ABCABCDC6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

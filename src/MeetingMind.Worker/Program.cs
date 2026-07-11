@@ -1,6 +1,8 @@
 using Hangfire;
 using Hangfire.PostgreSql;
 using MeetingMind.Application.Common.Interfaces;
+using MeetingMind.Application.Common.Options;
+using MeetingMind.Infrastructure.Audio;
 using MeetingMind.Infrastructure.Persistence;
 using MeetingMind.Worker.Jobs;
 using MeetingMind.Worker.Options;
@@ -14,6 +16,13 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 var processingOptions = builder.Configuration.GetSection("Processing").Get<ProcessingOptions>() ?? new ProcessingOptions();
 builder.Services.AddSingleton(processingOptions);
+
+var storageOptions = builder.Configuration.GetSection("Storage").Get<StorageOptions>() ?? new StorageOptions();
+builder.Services.AddSingleton(storageOptions);
+
+var audioProcessingOptions = builder.Configuration.GetSection("AudioProcessing").Get<AudioProcessingOptions>()
+    ?? new AudioProcessingOptions();
+builder.Services.AddSingleton(audioProcessingOptions);
 
 builder.Services.AddDbContext<MeetingMindDbContext>(options =>
 {
@@ -30,6 +39,7 @@ builder.Services.AddHangfire(configuration =>
 
 builder.Services.AddHangfireServer();
 builder.Services.AddScoped<IMeetingJobRepository, EfMeetingJobRepository>();
+builder.Services.AddScoped<IAudioProcessingService, FfmpegAudioProcessingService>();
 builder.Services.AddScoped<IMeetingProcessingJob, MeetingProcessingJob>();
 
 var host = builder.Build();
