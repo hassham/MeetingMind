@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\MeetingMind.Application\MeetingMind.Application.csproj" />
     <ProjectReference Include="..\..\src\MeetingMind.Domain\MeetingMind.Domain.csproj" />
   </ItemGroup>
 

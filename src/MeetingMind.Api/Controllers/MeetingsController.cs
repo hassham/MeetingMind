@@ -9,10 +9,14 @@ namespace MeetingMind.Api.Controllers;
 public class MeetingsController : ControllerBase
 {
     private readonly IUploadMeetingService _uploadMeetingService;
+    private readonly IMeetingStatusService _meetingStatusService;
 
-    public MeetingsController(IUploadMeetingService uploadMeetingService)
+    public MeetingsController(
+        IUploadMeetingService uploadMeetingService,
+        IMeetingStatusService meetingStatusService)
     {
         _uploadMeetingService = uploadMeetingService;
+        _meetingStatusService = meetingStatusService;
     }
 
     [HttpPost("upload")]
@@ -44,5 +48,27 @@ public class MeetingsController : ControllerBase
                 error = exception.Message
             });
         }
+    }
+
+    [HttpGet("{jobId:guid}/status")]
+    public async Task<IActionResult> GetStatus(Guid jobId, CancellationToken cancellationToken)
+    {
+        var result = await _meetingStatusService.GetStatusAsync(jobId, cancellationToken);
+        if (result is null)
+        {
+            return NotFound(new
+            {
+                error = "Meeting job not found."
+            });
+        }
+
+        return Ok(new
+        {
+            jobId = result.JobId,
+            status = result.Status,
+            stage = result.Stage,
+            progress = result.Progress,
+            errorMessage = result.ErrorMessage
+        });
     }
 }

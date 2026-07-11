@@ -51,6 +51,7 @@ builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddScoped<IBackgroundJobService, HangfireBackgroundJobService>();
 builder.Services.AddScoped<IMeetingJobRepository, EfMeetingJobRepository>();
 builder.Services.AddScoped<IUploadMeetingService, UploadMeetingService>();
+builder.Services.AddScoped<IMeetingStatusService, MeetingStatusService>();
 
 var app = builder.Build();
 

@@ -7,7 +7,7 @@ re-explaining state. Keep completed items here briefly, then move them to the
 
 Status legend: `TODO` | `IN PROGRESS` | `BLOCKED` | `PARTIAL` | `DONE`
 
-Last verified against code: 2026-07-06.
+Last verified against code: 2026-07-11.
 
 ## Current focus
 
@@ -29,10 +29,15 @@ Last verified against code: 2026-07-06.
       Worker Hangfire server, `IBackgroundJobService`, upload enqueueing, and a
       stub `MeetingProcessingJob` that marks jobs Processing then Failed with
       "Processing not yet implemented".
-- [ ] Phase 5 - Background job shell and status tracking.
+- [x] Phase 5 - Background job shell and status tracking.
+      Status: DONE.
+      Notes: Added `GET /api/meetings/{jobId}/status`, status query service,
+      repository read support, configurable Worker stub delay, and focused
+      status mapping tests.
+- [ ] Phase 6 - FFmpeg audio processing.
       Status: TODO.
-      Notes: Next active focus. Add status polling endpoint and verify queued,
-      processing, failed/completed state can be observed through the API.
+      Notes: Next active focus. Add `IAudioProcessingService` and FFmpeg-backed
+      validation/transcoding, without Whisper or GPT work.
 
 ## Verified current scaffold
 
@@ -100,7 +105,9 @@ Last verified against code: 2026-07-06.
       stages remain for later phases.
 - [ ] FR-004 Job status tracking: status, progress %, stage, error message,
       duration.
-      Status: TODO.
+      Status: PARTIAL.
+      Notes: `GET /api/meetings/{jobId}/status` exposes job ID, status, stage,
+      progress, and error message. Explicit duration is not exposed yet.
 - [ ] FR-005 Audio transcoding via FFmpeg.
       Status: TODO.
 - [ ] FR-006 Transcription via Whisper API.
@@ -163,7 +170,7 @@ Last verified against code: 2026-07-06.
       Notes: Implemented with Hangfire.
 - [ ] Upload/status/result/retry/download API endpoints.
       Status: PARTIAL.
-      Notes: Upload endpoint exists. Status, result, retry, and download
+      Notes: Upload and status endpoints exist. Result, retry, and download
       endpoints remain TODO.
 - [x] Remove placeholder weather endpoint and template classes.
       Status: DONE.
@@ -292,3 +299,4 @@ backlog before continuing to the next phase.
 - [x] Added local storage and backend upload job creation - done 2026-07-06.
 - [x] Refactored API endpoints into controllers - done 2026-07-07.
 - [x] Added Hangfire PostgreSQL enqueue/server/dashboard integration - done 2026-07-07.
+- [x] Added job status endpoint and configurable stub delay - done 2026-07-11.

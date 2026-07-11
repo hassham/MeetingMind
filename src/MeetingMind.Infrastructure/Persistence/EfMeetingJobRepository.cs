@@ -20,6 +20,13 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public Task<MeetingJob?> GetByIdAsync(Guid meetingJobId, CancellationToken cancellationToken)
+    {
+        return _dbContext.MeetingJobs
+            .AsNoTracking()
+            .SingleOrDefaultAsync(meetingJob => meetingJob.Id == meetingJobId, cancellationToken);
+    }
+
     public async Task SetHangfireJobIdAsync(
         Guid meetingJobId,
         string hangfireJobId,
