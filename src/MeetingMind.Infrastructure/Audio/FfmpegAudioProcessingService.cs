@@ -49,7 +49,6 @@ public class FfmpegAudioProcessingService : IAudioProcessingService
                 .OutputToFile(outputFullPath, overwrite: false, options => options
                     .WithCustomArgument("-vn")
                     .WithAudioCodec(_audioProcessingOptions.AudioCodec)
-                    .WithAudioBitrate(_audioProcessingOptions.AudioBitrateKbps)
                     .WithAudioSamplingRate(_audioProcessingOptions.SampleRate)
                     .WithCustomArgument($"-ac {_audioProcessingOptions.Channels}")
                     .ForceFormat(_audioProcessingOptions.OutputFormat))

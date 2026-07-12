@@ -31,33 +31,17 @@ public class WhisperNetTranscriptionService : ITranscriptionService
         }
 
         var modelPath = await GetModelPathAsync(cancellationToken);
-        var temporaryWavPath = Path.Combine(
-            Path.GetTempPath(),
-            $"meetingmind-transcription-{Guid.NewGuid():N}.wav");
+        using var whisperFactory = WhisperFactory.FromPath(modelPath);
+        using var processor = CreateProcessor(whisperFactory);
+        await using var audioStream = File.OpenRead(audioFullPath);
 
-        try
+        var transcript = new StringBuilder();
+        await foreach (var segment in processor.ProcessAsync(audioStream, cancellationToken))
         {
-            await ConvertToWhisperInputAsync(audioFullPath, temporaryWavPath);
-
-            using var whisperFactory = WhisperFactory.FromPath(modelPath);
-            using var processor = CreateProcessor(whisperFactory);
-            await using var audioStream = File.OpenRead(temporaryWavPath);
-
-            var transcript = new StringBuilder();
-            await foreach (var segment in processor.ProcessAsync(audioStream, cancellationToken))
-            {
-                transcript.Append(segment.Text);
-            }
-
-            return CleanTranscript(transcript.ToString());
+            transcript.Append(segment.Text);
         }
-        finally
-        {
-            if (File.Exists(temporaryWavPath))
-            {
-                File.Delete(temporaryWavPath);
-            }
-        }
+
+        return CleanTranscript(transcript.ToString());
     }
 
     private async Task<string> GetModelPathAsync(CancellationToken cancellationToken)
@@ -135,19 +119,6 @@ public class WhisperNetTranscriptionService : ITranscriptionService
         }
 
         return builder.WithLanguage(_transcriptionOptions.Language).Build();
-    }
-
-    private async Task ConvertToWhisperInputAsync(string inputPath, string outputPath)
-    {
-        await FFMpegArguments
-            .FromFileInput(inputPath)
-            .OutputToFile(outputPath, overwrite: true, options => options
-                .WithCustomArgument("-vn")
-                .WithAudioCodec("pcm_s16le")
-                .WithAudioSamplingRate(16000)
-                .WithCustomArgument("-ac 1")
-                .ForceFormat("wav"))
-            .ProcessAsynchronously(true);
     }
 
     private string GetSafeStorageFullPath(string relativePath)

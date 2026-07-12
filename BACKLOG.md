@@ -36,12 +36,12 @@ Last verified against code: 2026-07-11.
       status mapping tests.
 - [x] Phase 6 - FFmpeg audio processing.
       Status: DONE.
-      Notes: Added `IAudioProcessingService`, FFmpeg-backed MP3 transcoding via
-      `FFMpegCore`, Worker validation/transcoding status updates, processed
-      file path persistence, and a clear Phase 7 boundary failure message:
-      "Transcription not yet implemented".
-- [ ] Correction - Phase 6 should output Whisper-ready WAV, not MP3.
-      Status: TODO.
+      Notes: Added `IAudioProcessingService`, FFmpeg-backed Whisper-ready WAV
+      transcoding via `FFMpegCore`, Worker validation/transcoding status
+      updates, processed file path persistence, and a clear Phase 7 boundary
+      failure message: "Transcription not yet implemented".
+- [x] Correction - Phase 6 should output Whisper-ready WAV, not MP3.
+      Status: DONE.
       Description: Phase 6 currently outputs a normalized MP3, while Phase 7
       performs a second internal FFmpeg conversion to produce a Whisper-ready
       WAV. This is the wrong ownership boundary. Phase 6 must own all audio
@@ -131,7 +131,7 @@ Last verified against code: 2026-07-11.
       transcript -> clean -> minutes -> save -> complete.
       Status: PARTIAL.
       Notes: Hangfire now executes the Worker flow through upload, validation,
-      FFmpeg MP3 transcoding, processed path persistence, local Whisper
+      FFmpeg WAV transcoding, processed path persistence, local Whisper
       transcription, transcript text cleanup, transcript file storage, and
       transcript DB persistence. GPT and save-result stages remain for later
       phases.
@@ -142,8 +142,9 @@ Last verified against code: 2026-07-11.
       progress, and error message. Explicit duration is not exposed yet.
 - [x] FR-005 Audio transcoding via FFmpeg.
       Status: DONE.
-      Notes: Worker converts uploaded audio to normalized mono MP3 through
-      `IAudioProcessingService` and saves `ProcessedFilePath`.
+      Notes: Worker converts uploaded audio to Whisper-ready WAV
+      (`pcm_s16le`, `16000Hz`, mono) through `IAudioProcessingService` and
+      saves `ProcessedFilePath`.
 - [x] FR-006 Transcription via local Whisper.
       Status: DONE.
       Notes: Uses local `Whisper.net` with CPU runtime and configurable model
