@@ -13,6 +13,10 @@ public interface IMeetingJobRepository
 
     Task<MeetingMinutes?> GetMinutesByJobIdAsync(Guid meetingJobId, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<MeetingJob>> GetHistoryAsync(int skip, int take, CancellationToken cancellationToken);
+
+    Task<int> CountAsync(CancellationToken cancellationToken);
+
     Task SetHangfireJobIdAsync(Guid meetingJobId, string hangfireJobId, CancellationToken cancellationToken);
 
     Task SetProcessedFilePathAsync(Guid meetingJobId, string processedFilePath, CancellationToken cancellationToken);
@@ -27,6 +31,8 @@ public interface IMeetingJobRepository
         Guid meetingJobId,
         MeetingMinutes minutes,
         CancellationToken cancellationToken);
+
+    Task ResetForRetryAsync(Guid meetingJobId, CancellationToken cancellationToken);
 
     Task UpdateStatusAsync(
         Guid meetingJobId,

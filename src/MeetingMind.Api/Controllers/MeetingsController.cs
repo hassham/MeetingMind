@@ -12,17 +12,23 @@ public class MeetingsController : ControllerBase
     private readonly IMeetingStatusService _meetingStatusService;
     private readonly IMeetingTranscriptService _meetingTranscriptService;
     private readonly IMeetingMinutesResultService _meetingMinutesResultService;
+    private readonly IMeetingRetryService _meetingRetryService;
+    private readonly IMeetingHistoryService _meetingHistoryService;
 
     public MeetingsController(
         IUploadMeetingService uploadMeetingService,
         IMeetingStatusService meetingStatusService,
         IMeetingTranscriptService meetingTranscriptService,
-        IMeetingMinutesResultService meetingMinutesResultService)
+        IMeetingMinutesResultService meetingMinutesResultService,
+        IMeetingRetryService meetingRetryService,
+        IMeetingHistoryService meetingHistoryService)
     {
         _uploadMeetingService = uploadMeetingService;
         _meetingStatusService = meetingStatusService;
         _meetingTranscriptService = meetingTranscriptService;
         _meetingMinutesResultService = meetingMinutesResultService;
+        _meetingRetryService = meetingRetryService;
+        _meetingHistoryService = meetingHistoryService;
     }
 
     [HttpPost("upload")]
@@ -78,6 +84,35 @@ public class MeetingsController : ControllerBase
         });
     }
 
+    [HttpGet("history")]
+    public async Task<IActionResult> GetHistory(
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 50,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _meetingHistoryService.GetHistoryAsync(skip, take, cancellationToken);
+
+        return Ok(new
+        {
+            skip = result.Skip,
+            take = result.Take,
+            total = result.Total,
+            items = result.Items.Select(item => new
+            {
+                jobId = item.JobId,
+                originalFileName = item.OriginalFileName,
+                status = item.Status,
+                stage = item.Stage,
+                progress = item.Progress,
+                errorMessage = item.ErrorMessage,
+                createdAt = item.CreatedAt,
+                updatedAt = item.UpdatedAt,
+                startedAt = item.StartedAt,
+                completedAt = item.CompletedAt
+            })
+        });
+    }
+
     [HttpGet("{jobId:guid}/transcript/download")]
     public async Task<IActionResult> DownloadTranscript(Guid jobId, CancellationToken cancellationToken)
     {
@@ -91,6 +126,37 @@ public class MeetingsController : ControllerBase
         }
 
         return File(result.Content, result.ContentType, result.FileName);
+    }
+
+    [HttpPost("{jobId:guid}/retry")]
+    public async Task<IActionResult> Retry(Guid jobId, CancellationToken cancellationToken)
+    {
+        var result = await _meetingRetryService.RetryAsync(jobId, cancellationToken);
+        if (result.FailureReason == MeetingRetryFailureReason.NotFound)
+        {
+            return NotFound(new
+            {
+                error = "Meeting job not found."
+            });
+        }
+
+        if (result.FailureReason == MeetingRetryFailureReason.NotRetryable)
+        {
+            return Conflict(new
+            {
+                error = "Only failed or cancelled meeting jobs can be retried.",
+                jobId = result.JobId,
+                status = result.Status,
+                stage = result.Stage
+            });
+        }
+
+        return Accepted($"/api/meetings/{result.JobId}/status", new
+        {
+            jobId = result.JobId,
+            status = result.Status,
+            stage = result.Stage
+        });
     }
 
     [HttpGet("{jobId:guid}/result")]

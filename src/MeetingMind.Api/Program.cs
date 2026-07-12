@@ -54,6 +54,8 @@ builder.Services.AddScoped<IUploadMeetingService, UploadMeetingService>();
 builder.Services.AddScoped<IMeetingStatusService, MeetingStatusService>();
 builder.Services.AddScoped<IMeetingTranscriptService, MeetingTranscriptService>();
 builder.Services.AddScoped<IMeetingMinutesResultService, MeetingMinutesResultService>();
+builder.Services.AddScoped<IMeetingRetryService, MeetingRetryService>();
+builder.Services.AddScoped<IMeetingHistoryService, MeetingHistoryService>();
 
 var app = builder.Build();
 

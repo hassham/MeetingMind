@@ -72,6 +72,19 @@ public class MeetingStatusServiceTests
             throw new NotSupportedException();
         }
 
+        public Task<IReadOnlyList<MeetingJob>> GetHistoryAsync(
+            int skip,
+            int take,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<int> CountAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
         public Task SetHangfireJobIdAsync(Guid meetingJobId, string hangfireJobId, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
@@ -98,6 +111,11 @@ public class MeetingStatusServiceTests
             Guid meetingJobId,
             MeetingMinutes minutes,
             CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task ResetForRetryAsync(Guid meetingJobId, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
         }

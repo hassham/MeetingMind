@@ -70,10 +70,15 @@ Last verified against code: 2026-07-12.
       `IMeetingMinutesService`, configurable OpenAI settings, structured JSON
       persistence, Markdown minutes file storage, result endpoint, minutes
       download endpoint, and Worker completion flow.
-- [ ] Phase 9 - Retry and history.
-      Status: TODO.
-      Notes: Next active focus. Add failed-job retry endpoint with no auth and
+- [x] Phase 9 - Retry and history.
+      Status: DONE.
+      Notes: Added unauthenticated manual retry endpoint for Failed/Cancelled
+      jobs, reset-and-requeue behavior using the same job ID, and paginated
       processing history endpoint.
+- [ ] Phase 10 - Frontend MVP.
+      Status: TODO.
+      Notes: Next active focus. Build upload, status polling, transcript/minutes
+      viewing, downloads, retry, and history flows in the React app.
 
 ## Verified current scaffold
 
@@ -165,10 +170,16 @@ Last verified against code: 2026-07-12.
       Status: DONE for backend API.
       Notes: Transcript download, minutes result, and minutes Markdown download
       endpoints exist. Frontend result screens remain TODO under Frontend.
-- [ ] FR-009 Retry failed jobs: no auth check, any user.
-      Status: TODO.
-- [ ] FR-010 Processing history.
-      Status: TODO.
+- [x] FR-009 Retry failed jobs: no auth check, any user.
+      Status: DONE for backend API.
+      Notes: `POST /api/meetings/{jobId}/retry` allows Failed/Cancelled jobs,
+      reuses the same job ID, resets status to Queued/Uploaded, clears error
+      and run timestamps, stores a new Hangfire job ID, and returns 202.
+- [x] FR-010 Processing history.
+      Status: DONE for backend API.
+      Notes: `GET /api/meetings/history?skip=0&take=50` returns a bounded job
+      list with status, stage, progress, timestamps, original filename, and
+      error message. Default take is 50; max take is 100.
 
 ## Backend infrastructure setup
 
@@ -225,10 +236,11 @@ Last verified against code: 2026-07-12.
 - [x] `IBackgroundJobService` implementation.
       Status: DONE.
       Notes: Implemented with Hangfire.
-- [ ] Upload/status/result/retry/download API endpoints.
-      Status: PARTIAL.
+- [x] Upload/status/result/retry/download API endpoints.
+      Status: DONE for backend API.
       Notes: Upload, status, result, transcript download, and minutes download
-      endpoints exist. Retry endpoint remains TODO.
+      endpoints exist. Retry and history endpoints also exist. Frontend API
+      usage remains TODO under Frontend.
 - [x] Remove placeholder weather endpoint and template classes.
       Status: DONE.
 
@@ -260,9 +272,8 @@ Last verified against code: 2026-07-12.
       Notes: Resolved 2026-07-06. Hangfire is the selected queue/workflow
       technology for the local MVP.
 - [ ] No auth in v1 is intentional.
-      Status: TODO verify when retry endpoint exists.
-      Notes: Confirm retry endpoint has no access control anywhere in code,
-      matching PRD/FSD/SAD. Do not add auth prematurely.
+      Status: DONE verified for backend retry endpoint.
+      Notes: Retry endpoint has no access control, matching PRD/FSD/SAD.
 - [ ] Long-transcript chunking / hierarchical summarization.
       Status: TODO design later.
       Notes: Identified as a PRD risk and needed before testing long meetings.
@@ -275,7 +286,8 @@ Last verified against code: 2026-07-12.
       Status: PARTIAL.
       Notes: Storage, max upload size, and audio processing settings are
       present. Local transcription and GPT/OpenAI settings are present.
-      Processing retry settings are not present yet.
+      Hangfire automatic retry settings are not present; Phase 9 intentionally
+      added manual retry only.
 
 ## Proposed phase plan
 

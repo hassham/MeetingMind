@@ -45,6 +45,24 @@ public class EfMeetingJobRepository : IMeetingJobRepository
             .SingleOrDefaultAsync(minutes => minutes.MeetingJobId == meetingJobId, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<MeetingJob>> GetHistoryAsync(
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.MeetingJobs
+            .AsNoTracking()
+            .OrderByDescending(meetingJob => meetingJob.CreatedAt)
+            .Skip(skip)
+            .Take(take)
+            .ToArrayAsync(cancellationToken);
+    }
+
+    public Task<int> CountAsync(CancellationToken cancellationToken)
+    {
+        return _dbContext.MeetingJobs.CountAsync(cancellationToken);
+    }
+
     public async Task SetHangfireJobIdAsync(
         Guid meetingJobId,
         string hangfireJobId,
@@ -133,6 +151,23 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         existingMinutes.MinutesFilePath = minutes.MinutesFilePath;
 
         var meetingJob = await GetMeetingJobAsync(meetingJobId, cancellationToken);
+        meetingJob.UpdatedAt = now;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ResetForRetryAsync(Guid meetingJobId, CancellationToken cancellationToken)
+    {
+        var meetingJob = await GetMeetingJobAsync(meetingJobId, cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+
+        meetingJob.Status = MeetingJobStatus.Queued;
+        meetingJob.Stage = MeetingJobStage.Uploaded;
+        meetingJob.Progress = 0;
+        meetingJob.ErrorMessage = null;
+        meetingJob.HangfireJobId = null;
+        meetingJob.StartedAt = null;
+        meetingJob.CompletedAt = null;
         meetingJob.UpdatedAt = now;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
