@@ -10,13 +10,16 @@ public class MeetingsController : ControllerBase
 {
     private readonly IUploadMeetingService _uploadMeetingService;
     private readonly IMeetingStatusService _meetingStatusService;
+    private readonly IMeetingTranscriptService _meetingTranscriptService;
 
     public MeetingsController(
         IUploadMeetingService uploadMeetingService,
-        IMeetingStatusService meetingStatusService)
+        IMeetingStatusService meetingStatusService,
+        IMeetingTranscriptService meetingTranscriptService)
     {
         _uploadMeetingService = uploadMeetingService;
         _meetingStatusService = meetingStatusService;
+        _meetingTranscriptService = meetingTranscriptService;
     }
 
     [HttpPost("upload")]
@@ -70,5 +73,20 @@ public class MeetingsController : ControllerBase
             progress = result.Progress,
             errorMessage = result.ErrorMessage
         });
+    }
+
+    [HttpGet("{jobId:guid}/transcript/download")]
+    public async Task<IActionResult> DownloadTranscript(Guid jobId, CancellationToken cancellationToken)
+    {
+        var result = await _meetingTranscriptService.GetTranscriptDownloadAsync(jobId, cancellationToken);
+        if (result is null)
+        {
+            return NotFound(new
+            {
+                error = "Meeting transcript not found."
+            });
+        }
+
+        return File(result.Content, result.ContentType, result.FileName);
     }
 }

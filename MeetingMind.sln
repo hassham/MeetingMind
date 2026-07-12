@@ -23,6 +23,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		AGENTS.md = AGENTS.md
 		BACKLOG.md = BACKLOG.md
 		docker-compose.yml = docker-compose.yml
+		QUESTIONS.md = QUESTIONS.md
 		QUESTIONS_phase6_ffmpeg_audio_processing.md = QUESTIONS_phase6_ffmpeg_audio_processing.md
 		README.md = README.md
 		WORKFLOW.md = WORKFLOW.md

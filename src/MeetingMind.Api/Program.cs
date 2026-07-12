@@ -52,6 +52,7 @@ builder.Services.AddScoped<IBackgroundJobService, HangfireBackgroundJobService>(
 builder.Services.AddScoped<IMeetingJobRepository, EfMeetingJobRepository>();
 builder.Services.AddScoped<IUploadMeetingService, UploadMeetingService>();
 builder.Services.AddScoped<IMeetingStatusService, MeetingStatusService>();
+builder.Services.AddScoped<IMeetingTranscriptService, MeetingTranscriptService>();
 
 var app = builder.Build();
 

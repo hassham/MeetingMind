@@ -4,6 +4,8 @@ using MeetingMind.Application.Common.Interfaces;
 using MeetingMind.Application.Common.Options;
 using MeetingMind.Infrastructure.Audio;
 using MeetingMind.Infrastructure.Persistence;
+using MeetingMind.Infrastructure.Storage;
+using MeetingMind.Infrastructure.Transcription;
 using MeetingMind.Worker.Jobs;
 using MeetingMind.Worker.Options;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +26,10 @@ var audioProcessingOptions = builder.Configuration.GetSection("AudioProcessing")
     ?? new AudioProcessingOptions();
 builder.Services.AddSingleton(audioProcessingOptions);
 
+var transcriptionOptions = builder.Configuration.GetSection("Transcription").Get<TranscriptionOptions>()
+    ?? new TranscriptionOptions();
+builder.Services.AddSingleton(transcriptionOptions);
+
 builder.Services.AddDbContext<MeetingMindDbContext>(options =>
 {
     options.UseNpgsql(connectionString);
@@ -39,7 +45,9 @@ builder.Services.AddHangfire(configuration =>
 
 builder.Services.AddHangfireServer();
 builder.Services.AddScoped<IMeetingJobRepository, EfMeetingJobRepository>();
+builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddScoped<IAudioProcessingService, FfmpegAudioProcessingService>();
+builder.Services.AddScoped<ITranscriptionService, WhisperNetTranscriptionService>();
 builder.Services.AddScoped<IMeetingProcessingJob, MeetingProcessingJob>();
 
 var host = builder.Build();

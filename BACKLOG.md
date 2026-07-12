@@ -40,10 +40,34 @@ Last verified against code: 2026-07-11.
       `FFMpegCore`, Worker validation/transcoding status updates, processed
       file path persistence, and a clear Phase 7 boundary failure message:
       "Transcription not yet implemented".
-- [ ] Phase 7 - Transcription integration.
+- [ ] Correction - Phase 6 should output Whisper-ready WAV, not MP3.
       Status: TODO.
-      Notes: Next active focus. Add Whisper transcription behind
-      `ITranscriptionService`; do not add GPT minutes generation yet.
+      Description: Phase 6 currently outputs a normalized MP3, while Phase 7
+      performs a second internal FFmpeg conversion to produce a Whisper-ready
+      WAV. This is the wrong ownership boundary. Phase 6 must own all audio
+      conversion and persist a Whisper-compatible WAV directly:
+      `pcm_s16le`, `16000Hz`, mono. Phase 7 should receive the processed WAV
+      from `MeetingJob.ProcessedFilePath` and feed it directly to Whisper with
+      no additional FFmpeg conversion.
+      Acceptance criteria:
+      - `IAudioProcessingService` outputs `.wav` files under
+        `Storage/Audio/Processed`.
+      - Processed audio is encoded as `pcm_s16le`, `16000Hz`, mono.
+      - `MeetingJob.ProcessedFilePath` points to the WAV output.
+      - Phase 7 transcription does not run FFmpeg or create a temporary WAV.
+      - Manual test confirms upload -> Phase 6 processed WAV -> Phase 7
+        Whisper transcription works without a second conversion.
+- [x] Phase 7 - Transcription integration.
+      Status: DONE.
+      Notes: Added local Whisper transcription behind `ITranscriptionService`
+      using `Whisper.net`, CPU runtime, configurable/autodownloaded local
+      model files, transcript `.txt` storage, transcript DB persistence, and
+      transcript download endpoint. GPT minutes generation remains out of
+      scope.
+- [ ] Phase 8 - Meeting minutes generation.
+      Status: TODO.
+      Notes: Next active focus. Add GPT/OpenAI meeting minutes generation
+      behind `IMeetingMinutesService`.
 
 ## Verified current scaffold
 
@@ -107,8 +131,10 @@ Last verified against code: 2026-07-11.
       transcript -> clean -> minutes -> save -> complete.
       Status: PARTIAL.
       Notes: Hangfire now executes the Worker flow through upload, validation,
-      FFmpeg MP3 transcoding, and processed path persistence. Whisper,
-      transcript cleanup, GPT, and save-result stages remain for later phases.
+      FFmpeg MP3 transcoding, processed path persistence, local Whisper
+      transcription, transcript text cleanup, transcript file storage, and
+      transcript DB persistence. GPT and save-result stages remain for later
+      phases.
 - [ ] FR-004 Job status tracking: status, progress %, stage, error message,
       duration.
       Status: PARTIAL.
@@ -118,13 +144,18 @@ Last verified against code: 2026-07-11.
       Status: DONE.
       Notes: Worker converts uploaded audio to normalized mono MP3 through
       `IAudioProcessingService` and saves `ProcessedFilePath`.
-- [ ] FR-006 Transcription via Whisper API.
-      Status: TODO.
+- [x] FR-006 Transcription via local Whisper.
+      Status: DONE.
+      Notes: Uses local `Whisper.net` with CPU runtime and configurable model
+      provisioning. This intentionally replaces the earlier OpenAI Whisper API
+      wording for the local MVP.
 - [ ] FR-007 Meeting minutes generation via GPT: title, summary, attendees,
       discussion, decisions, action items, risks, next steps.
       Status: TODO.
 - [ ] FR-008 View/download transcript and minutes.
-      Status: TODO.
+      Status: PARTIAL.
+      Notes: Transcript download endpoint exists. Minutes view/download remains
+      TODO for later phases.
 - [ ] FR-009 Retry failed jobs: no auth check, any user.
       Status: TODO.
 - [ ] FR-010 Processing history.
@@ -167,10 +198,11 @@ Last verified against code: 2026-07-11.
       Status: DONE.
       Notes: Implemented with `FFMpegCore`; FFmpeg binaries must be available
       on PATH or configured via `AudioProcessing:FfmpegBinaryFolder`.
-- [ ] `ITranscriptionService` interface.
-      Status: TODO.
-- [ ] Whisper `ITranscriptionService` implementation.
-      Status: TODO.
+- [x] `ITranscriptionService` interface.
+      Status: DONE.
+- [x] Local Whisper `ITranscriptionService` implementation.
+      Status: DONE.
+      Notes: Implemented with `Whisper.net` and `Whisper.net.Runtime`.
 - [ ] `IMeetingMinutesService` interface.
       Status: TODO.
 - [ ] GPT `IMeetingMinutesService` implementation with structured JSON output.
@@ -182,8 +214,8 @@ Last verified against code: 2026-07-11.
       Notes: Implemented with Hangfire.
 - [ ] Upload/status/result/retry/download API endpoints.
       Status: PARTIAL.
-      Notes: Upload and status endpoints exist. Result, retry, and download
-      endpoints remain TODO.
+      Notes: Upload, status, and transcript download endpoints exist. Result,
+      retry, and minutes download endpoints remain TODO.
 - [x] Remove placeholder weather endpoint and template classes.
       Status: DONE.
 
@@ -229,8 +261,8 @@ Last verified against code: 2026-07-11.
 - [ ] Secrets/configuration strategy is incomplete.
       Status: TODO.
       Notes: Storage, max upload size, and audio processing settings are
-      present. OpenAI settings and processing retry settings are not present
-      yet.
+      present. Local transcription settings are present. GPT/OpenAI settings
+      and processing retry settings are not present yet.
 
 ## Proposed phase plan
 
@@ -277,10 +309,10 @@ backlog before continuing to the next phase.
    - Verify with a small sample audio file.
 
 7. Phase 7 - Transcription integration
-   - Implement Whisper transcription client behind `ITranscriptionService`.
+   - Implement local Whisper transcription behind `ITranscriptionService`.
    - Save transcript record and transcript file.
    - Add transcript download path.
-   - Verify with configured secrets/environment variables.
+   - Verify with configured or downloaded local Whisper model.
 
 8. Phase 8 - Meeting minutes generation
    - Implement GPT minutes client behind `IMeetingMinutesService`.

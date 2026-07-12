@@ -27,6 +27,15 @@ public class EfMeetingJobRepository : IMeetingJobRepository
             .SingleOrDefaultAsync(meetingJob => meetingJob.Id == meetingJobId, cancellationToken);
     }
 
+    public Task<MeetingTranscript?> GetTranscriptByJobIdAsync(
+        Guid meetingJobId,
+        CancellationToken cancellationToken)
+    {
+        return _dbContext.MeetingTranscripts
+            .AsNoTracking()
+            .SingleOrDefaultAsync(transcript => transcript.MeetingJobId == meetingJobId, cancellationToken);
+    }
+
     public async Task SetHangfireJobIdAsync(
         Guid meetingJobId,
         string hangfireJobId,
@@ -47,6 +56,38 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         var meetingJob = await GetMeetingJobAsync(meetingJobId, cancellationToken);
         meetingJob.ProcessedFilePath = processedFilePath;
         meetingJob.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SaveTranscriptAsync(
+        Guid meetingJobId,
+        string transcriptText,
+        string transcriptFilePath,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var transcript = await _dbContext.MeetingTranscripts.SingleOrDefaultAsync(
+            existingTranscript => existingTranscript.MeetingJobId == meetingJobId,
+            cancellationToken);
+
+        if (transcript is null)
+        {
+            transcript = new MeetingTranscript
+            {
+                Id = Guid.NewGuid(),
+                MeetingJobId = meetingJobId,
+                CreatedAt = now
+            };
+
+            await _dbContext.MeetingTranscripts.AddAsync(transcript, cancellationToken);
+        }
+
+        transcript.TranscriptText = transcriptText;
+        transcript.TranscriptFilePath = transcriptFilePath;
+
+        var meetingJob = await GetMeetingJobAsync(meetingJobId, cancellationToken);
+        meetingJob.UpdatedAt = now;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
     }

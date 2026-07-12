@@ -111,6 +111,9 @@ Now build. During implementation:
 
 ### Anything I flagged during implementation
 [Surprises, concerns, or decisions that deviated from the plan]
+
+### Steps to test the application
+Add steps to run the application and do manual testing
 ```
 
 ---

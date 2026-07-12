@@ -58,6 +58,13 @@ public class MeetingStatusServiceTests
             return Task.FromResult(MeetingJob?.Id == meetingJobId ? MeetingJob : null);
         }
 
+        public Task<MeetingTranscript?> GetTranscriptByJobIdAsync(
+            Guid meetingJobId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
         public Task SetHangfireJobIdAsync(Guid meetingJobId, string hangfireJobId, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
@@ -66,6 +73,15 @@ public class MeetingStatusServiceTests
         public Task SetProcessedFilePathAsync(
             Guid meetingJobId,
             string processedFilePath,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task SaveTranscriptAsync(
+            Guid meetingJobId,
+            string transcriptText,
+            string transcriptFilePath,
             CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
