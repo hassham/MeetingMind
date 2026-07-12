@@ -11,6 +11,8 @@ public interface IMeetingJobRepository
 
     Task<MeetingTranscript?> GetTranscriptByJobIdAsync(Guid meetingJobId, CancellationToken cancellationToken);
 
+    Task<MeetingMinutes?> GetMinutesByJobIdAsync(Guid meetingJobId, CancellationToken cancellationToken);
+
     Task SetHangfireJobIdAsync(Guid meetingJobId, string hangfireJobId, CancellationToken cancellationToken);
 
     Task SetProcessedFilePathAsync(Guid meetingJobId, string processedFilePath, CancellationToken cancellationToken);
@@ -19,6 +21,11 @@ public interface IMeetingJobRepository
         Guid meetingJobId,
         string transcriptText,
         string transcriptFilePath,
+        CancellationToken cancellationToken);
+
+    Task SaveMinutesAsync(
+        Guid meetingJobId,
+        MeetingMinutes minutes,
         CancellationToken cancellationToken);
 
     Task UpdateStatusAsync(

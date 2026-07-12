@@ -11,15 +11,18 @@ public class MeetingsController : ControllerBase
     private readonly IUploadMeetingService _uploadMeetingService;
     private readonly IMeetingStatusService _meetingStatusService;
     private readonly IMeetingTranscriptService _meetingTranscriptService;
+    private readonly IMeetingMinutesResultService _meetingMinutesResultService;
 
     public MeetingsController(
         IUploadMeetingService uploadMeetingService,
         IMeetingStatusService meetingStatusService,
-        IMeetingTranscriptService meetingTranscriptService)
+        IMeetingTranscriptService meetingTranscriptService,
+        IMeetingMinutesResultService meetingMinutesResultService)
     {
         _uploadMeetingService = uploadMeetingService;
         _meetingStatusService = meetingStatusService;
         _meetingTranscriptService = meetingTranscriptService;
+        _meetingMinutesResultService = meetingMinutesResultService;
     }
 
     [HttpPost("upload")]
@@ -84,6 +87,47 @@ public class MeetingsController : ControllerBase
             return NotFound(new
             {
                 error = "Meeting transcript not found."
+            });
+        }
+
+        return File(result.Content, result.ContentType, result.FileName);
+    }
+
+    [HttpGet("{jobId:guid}/result")]
+    public async Task<IActionResult> GetResult(Guid jobId, CancellationToken cancellationToken)
+    {
+        var result = await _meetingMinutesResultService.GetMinutesAsync(jobId, cancellationToken);
+        if (result is null)
+        {
+            return NotFound(new
+            {
+                error = "Meeting minutes not found."
+            });
+        }
+
+        return Ok(new
+        {
+            jobId = result.JobId,
+            title = result.Title,
+            summary = result.Summary,
+            attendees = result.Attendees,
+            discussionPoints = result.DiscussionPoints,
+            decisions = result.Decisions,
+            actionItems = result.ActionItems,
+            risks = result.Risks,
+            nextSteps = result.NextSteps
+        });
+    }
+
+    [HttpGet("{jobId:guid}/minutes/download")]
+    public async Task<IActionResult> DownloadMinutes(Guid jobId, CancellationToken cancellationToken)
+    {
+        var result = await _meetingMinutesResultService.GetMinutesDownloadAsync(jobId, cancellationToken);
+        if (result is null)
+        {
+            return NotFound(new
+            {
+                error = "Meeting minutes not found."
             });
         }
 

@@ -7,7 +7,7 @@ re-explaining state. Keep completed items here briefly, then move them to the
 
 Status legend: `TODO` | `IN PROGRESS` | `BLOCKED` | `PARTIAL` | `DONE`
 
-Last verified against code: 2026-07-11.
+Last verified against code: 2026-07-12.
 
 ## Current focus
 
@@ -64,10 +64,16 @@ Last verified against code: 2026-07-11.
       model files, transcript `.txt` storage, transcript DB persistence, and
       transcript download endpoint. GPT minutes generation remains out of
       scope.
-- [ ] Phase 8 - Meeting minutes generation.
+- [x] Phase 8 - Meeting minutes generation.
+      Status: DONE.
+      Notes: Added OpenAI-backed GPT meeting minutes generation behind
+      `IMeetingMinutesService`, configurable OpenAI settings, structured JSON
+      persistence, Markdown minutes file storage, result endpoint, minutes
+      download endpoint, and Worker completion flow.
+- [ ] Phase 9 - Retry and history.
       Status: TODO.
-      Notes: Next active focus. Add GPT/OpenAI meeting minutes generation
-      behind `IMeetingMinutesService`.
+      Notes: Next active focus. Add failed-job retry endpoint with no auth and
+      processing history endpoint.
 
 ## Verified current scaffold
 
@@ -127,14 +133,14 @@ Last verified against code: 2026-07-11.
       Status: DONE.
       Notes: Upload saves the file, creates a queued DB record, enqueues a
       Hangfire job, stores `HangfireJobId`, and returns `jobId` immediately.
-- [ ] FR-003 Background processing pipeline: validate -> transcode ->
+- [x] FR-003 Background processing pipeline: validate -> transcode ->
       transcript -> clean -> minutes -> save -> complete.
-      Status: PARTIAL.
+      Status: DONE for backend pipeline.
       Notes: Hangfire now executes the Worker flow through upload, validation,
       FFmpeg WAV transcoding, processed path persistence, local Whisper
-      transcription, transcript text cleanup, transcript file storage, and
-      transcript DB persistence. GPT and save-result stages remain for later
-      phases.
+      transcription, transcript file storage, transcript DB persistence,
+      OpenAI GPT meeting-minutes generation, Markdown minutes storage,
+      structured minutes DB persistence, and completion status updates.
 - [ ] FR-004 Job status tracking: status, progress %, stage, error message,
       duration.
       Status: PARTIAL.
@@ -150,13 +156,15 @@ Last verified against code: 2026-07-11.
       Notes: Uses local `Whisper.net` with CPU runtime and configurable model
       provisioning. This intentionally replaces the earlier OpenAI Whisper API
       wording for the local MVP.
-- [ ] FR-007 Meeting minutes generation via GPT: title, summary, attendees,
+- [x] FR-007 Meeting minutes generation via GPT: title, summary, attendees,
       discussion, decisions, action items, risks, next steps.
-      Status: TODO.
-- [ ] FR-008 View/download transcript and minutes.
-      Status: PARTIAL.
-      Notes: Transcript download endpoint exists. Minutes view/download remains
-      TODO for later phases.
+      Status: DONE for backend Worker.
+      Notes: Attendees and discussion points are stored in `FullMinutesJson`;
+      dedicated DB columns were intentionally deferred.
+- [x] FR-008 View/download transcript and minutes.
+      Status: DONE for backend API.
+      Notes: Transcript download, minutes result, and minutes Markdown download
+      endpoints exist. Frontend result screens remain TODO under Frontend.
 - [ ] FR-009 Retry failed jobs: no auth check, any user.
       Status: TODO.
 - [ ] FR-010 Processing history.
@@ -204,10 +212,14 @@ Last verified against code: 2026-07-11.
 - [x] Local Whisper `ITranscriptionService` implementation.
       Status: DONE.
       Notes: Implemented with `Whisper.net` and `Whisper.net.Runtime`.
-- [ ] `IMeetingMinutesService` interface.
-      Status: TODO.
-- [ ] GPT `IMeetingMinutesService` implementation with structured JSON output.
-      Status: TODO.
+- [x] `IMeetingMinutesService` interface.
+      Status: DONE.
+- [x] GPT `IMeetingMinutesService` implementation with structured JSON output.
+      Status: DONE.
+      Notes: Implemented with the official OpenAI .NET SDK, strict structured
+      JSON response format, configurable model defaulting to `gpt-4.1`, API key
+      lookup via `OpenAI:ApiKey` then `OPENAI_API_KEY`, and a configurable
+      transcript length guard defaulting to 120000 characters.
 - [x] `IBackgroundJobService` interface.
       Status: DONE.
 - [x] `IBackgroundJobService` implementation.
@@ -215,8 +227,8 @@ Last verified against code: 2026-07-11.
       Notes: Implemented with Hangfire.
 - [ ] Upload/status/result/retry/download API endpoints.
       Status: PARTIAL.
-      Notes: Upload, status, and transcript download endpoints exist. Result,
-      retry, and minutes download endpoints remain TODO.
+      Notes: Upload, status, result, transcript download, and minutes download
+      endpoints exist. Retry endpoint remains TODO.
 - [x] Remove placeholder weather endpoint and template classes.
       Status: DONE.
 
@@ -260,10 +272,10 @@ Last verified against code: 2026-07-11.
       `Storage/Transcript`, `Storage/Minutes`.
       Notes: Folders are configured and created by `LocalFileStorageService`.
 - [ ] Secrets/configuration strategy is incomplete.
-      Status: TODO.
+      Status: PARTIAL.
       Notes: Storage, max upload size, and audio processing settings are
-      present. Local transcription settings are present. GPT/OpenAI settings
-      and processing retry settings are not present yet.
+      present. Local transcription and GPT/OpenAI settings are present.
+      Processing retry settings are not present yet.
 
 ## Proposed phase plan
 

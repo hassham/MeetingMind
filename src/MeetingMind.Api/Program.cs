@@ -53,6 +53,7 @@ builder.Services.AddScoped<IMeetingJobRepository, EfMeetingJobRepository>();
 builder.Services.AddScoped<IUploadMeetingService, UploadMeetingService>();
 builder.Services.AddScoped<IMeetingStatusService, MeetingStatusService>();
 builder.Services.AddScoped<IMeetingTranscriptService, MeetingTranscriptService>();
+builder.Services.AddScoped<IMeetingMinutesResultService, MeetingMinutesResultService>();
 
 var app = builder.Build();
 

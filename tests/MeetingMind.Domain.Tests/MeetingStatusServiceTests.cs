@@ -65,6 +65,13 @@ public class MeetingStatusServiceTests
             throw new NotSupportedException();
         }
 
+        public Task<MeetingMinutes?> GetMinutesByJobIdAsync(
+            Guid meetingJobId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
         public Task SetHangfireJobIdAsync(Guid meetingJobId, string hangfireJobId, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
@@ -82,6 +89,14 @@ public class MeetingStatusServiceTests
             Guid meetingJobId,
             string transcriptText,
             string transcriptFilePath,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task SaveMinutesAsync(
+            Guid meetingJobId,
+            MeetingMinutes minutes,
             CancellationToken cancellationToken)
         {
             throw new NotSupportedException();

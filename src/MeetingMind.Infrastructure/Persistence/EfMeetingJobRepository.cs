@@ -36,6 +36,15 @@ public class EfMeetingJobRepository : IMeetingJobRepository
             .SingleOrDefaultAsync(transcript => transcript.MeetingJobId == meetingJobId, cancellationToken);
     }
 
+    public Task<MeetingMinutes?> GetMinutesByJobIdAsync(
+        Guid meetingJobId,
+        CancellationToken cancellationToken)
+    {
+        return _dbContext.MeetingMinutes
+            .AsNoTracking()
+            .SingleOrDefaultAsync(minutes => minutes.MeetingJobId == meetingJobId, cancellationToken);
+    }
+
     public async Task SetHangfireJobIdAsync(
         Guid meetingJobId,
         string hangfireJobId,
@@ -85,6 +94,43 @@ public class EfMeetingJobRepository : IMeetingJobRepository
 
         transcript.TranscriptText = transcriptText;
         transcript.TranscriptFilePath = transcriptFilePath;
+
+        var meetingJob = await GetMeetingJobAsync(meetingJobId, cancellationToken);
+        meetingJob.UpdatedAt = now;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SaveMinutesAsync(
+        Guid meetingJobId,
+        MeetingMinutes minutes,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var existingMinutes = await _dbContext.MeetingMinutes.SingleOrDefaultAsync(
+            currentMinutes => currentMinutes.MeetingJobId == meetingJobId,
+            cancellationToken);
+
+        if (existingMinutes is null)
+        {
+            existingMinutes = new MeetingMinutes
+            {
+                Id = Guid.NewGuid(),
+                MeetingJobId = meetingJobId,
+                CreatedAt = now
+            };
+
+            await _dbContext.MeetingMinutes.AddAsync(existingMinutes, cancellationToken);
+        }
+
+        existingMinutes.Title = minutes.Title;
+        existingMinutes.Summary = minutes.Summary;
+        existingMinutes.DecisionsJson = minutes.DecisionsJson;
+        existingMinutes.ActionItemsJson = minutes.ActionItemsJson;
+        existingMinutes.RisksJson = minutes.RisksJson;
+        existingMinutes.NextStepsJson = minutes.NextStepsJson;
+        existingMinutes.FullMinutesJson = minutes.FullMinutesJson;
+        existingMinutes.MinutesFilePath = minutes.MinutesFilePath;
 
         var meetingJob = await GetMeetingJobAsync(meetingJobId, cancellationToken);
         meetingJob.UpdatedAt = now;

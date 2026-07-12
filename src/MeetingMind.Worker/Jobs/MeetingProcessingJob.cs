@@ -1,12 +1,16 @@
 using MeetingMind.Application.Common.Interfaces;
+using MeetingMind.Application.Meetings;
+using MeetingMind.Domain.Entities;
 using MeetingMind.Domain.Enums;
 using MeetingMind.Worker.Options;
+using System.Text.Json;
 
 namespace MeetingMind.Worker.Jobs;
 
 public class MeetingProcessingJob : IMeetingProcessingJob
 {
     private const int MaxErrorLength = 1000;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly ILogger<MeetingProcessingJob> _logger;
     private readonly IAudioProcessingService _audioProcessingService;
@@ -14,6 +18,7 @@ public class MeetingProcessingJob : IMeetingProcessingJob
     private readonly IMeetingJobRepository _meetingJobRepository;
     private readonly ProcessingOptions _processingOptions;
     private readonly ITranscriptionService _transcriptionService;
+    private readonly IMeetingMinutesService _meetingMinutesService;
 
     public MeetingProcessingJob(
         ILogger<MeetingProcessingJob> logger,
@@ -21,7 +26,8 @@ public class MeetingProcessingJob : IMeetingProcessingJob
         IFileStorageService fileStorageService,
         IMeetingJobRepository meetingJobRepository,
         ProcessingOptions processingOptions,
-        ITranscriptionService transcriptionService)
+        ITranscriptionService transcriptionService,
+        IMeetingMinutesService meetingMinutesService)
     {
         _logger = logger;
         _audioProcessingService = audioProcessingService;
@@ -29,6 +35,7 @@ public class MeetingProcessingJob : IMeetingProcessingJob
         _meetingJobRepository = meetingJobRepository;
         _processingOptions = processingOptions;
         _transcriptionService = transcriptionService;
+        _meetingMinutesService = meetingMinutesService;
     }
 
     public async Task ProcessMeetingAsync(Guid jobId)
@@ -115,11 +122,48 @@ public class MeetingProcessingJob : IMeetingProcessingJob
 
             await _meetingJobRepository.UpdateStatusAsync(
                 jobId,
-                MeetingJobStatus.Failed,
+                MeetingJobStatus.Processing,
                 MeetingJobStage.GeneratingMinutes,
                 progress: 60,
-                errorMessage: "Meeting minutes not yet implemented",
+                errorMessage: null,
                 CancellationToken.None);
+            currentStage = MeetingJobStage.GeneratingMinutes;
+            currentProgress = 60;
+
+            var generatedMinutes = await _meetingMinutesService.GenerateMinutesAsync(
+                transcriptText,
+                CancellationToken.None);
+
+            var minutesMarkdown = MeetingMinutesFormatter.ToMarkdown(generatedMinutes);
+            var minutesFilePath = await _fileStorageService.SaveMinutesAsync(
+                jobId,
+                minutesMarkdown,
+                CancellationToken.None);
+
+            await _meetingJobRepository.UpdateStatusAsync(
+                jobId,
+                MeetingJobStatus.Processing,
+                MeetingJobStage.SavingResults,
+                progress: 90,
+                errorMessage: null,
+                CancellationToken.None);
+            currentStage = MeetingJobStage.SavingResults;
+            currentProgress = 90;
+
+            await _meetingJobRepository.SaveMinutesAsync(
+                jobId,
+                CreateMeetingMinutes(jobId, generatedMinutes, minutesFilePath),
+                CancellationToken.None);
+
+            await _meetingJobRepository.UpdateStatusAsync(
+                jobId,
+                MeetingJobStatus.Completed,
+                MeetingJobStage.Completed,
+                progress: 100,
+                errorMessage: null,
+                CancellationToken.None);
+
+            _logger.LogInformation("Meeting processing completed for job {JobId}", jobId);
         }
         catch (Exception exception)
         {
@@ -133,6 +177,27 @@ public class MeetingProcessingJob : IMeetingProcessingJob
                 errorMessage: SanitizeError(exception.Message),
                 CancellationToken.None);
         }
+    }
+
+    private static MeetingMinutes CreateMeetingMinutes(
+        Guid jobId,
+        MeetingMinutesContent minutes,
+        string minutesFilePath)
+    {
+        return new MeetingMinutes
+        {
+            Id = Guid.NewGuid(),
+            MeetingJobId = jobId,
+            Title = minutes.Title,
+            Summary = minutes.Summary,
+            DecisionsJson = JsonSerializer.Serialize(minutes.Decisions, JsonOptions),
+            ActionItemsJson = JsonSerializer.Serialize(minutes.ActionItems, JsonOptions),
+            RisksJson = JsonSerializer.Serialize(minutes.Risks, JsonOptions),
+            NextStepsJson = JsonSerializer.Serialize(minutes.NextSteps, JsonOptions),
+            FullMinutesJson = JsonSerializer.Serialize(minutes, JsonOptions),
+            MinutesFilePath = minutesFilePath,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
     }
 
     private static string SanitizeError(string message)
