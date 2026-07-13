@@ -1,217 +1,400 @@
 # MeetingMind AI
 
-MeetingMind AI is an AI meeting-minutes generator that turns uploaded meeting
-audio into structured, searchable meeting records: transcripts, summaries,
-decisions, action items, risks, and next steps.
+MeetingMind AI is a local AI meeting-minutes application that converts uploaded
+audio into a transcript and structured meeting minutes. It identifies the
+meeting summary, attendees, discussion points, decisions, action items, risks,
+and next steps.
 
-The project is being built as a local-first MVP with a cloud-ready architecture.
-Long-running audio and AI work is designed to run outside the HTTP request path
-through background jobs, keeping the API responsive while processing continues.
+The application uses an asynchronous workflow: the API accepts an upload and
+returns a job ID immediately, while a separate Hangfire worker performs audio
+conversion, transcription, minutes generation, and result storage.
 
-## Current Status
+## Current status
 
-This repository is currently in the foundation/scaffolding stage.
+The local MVP is complete and has been verified with end-to-end audio tests.
+The implemented workflow supports:
 
-Already scaffolded:
+- Uploading MP3, WAV, M4A, and AAC audio files.
+- Validating file extension, MIME type, filename, and configurable file size.
+- Returning a job ID without waiting for audio or AI processing.
+- Tracking job stage, status, progress, and errors.
+- Converting audio to Whisper-compatible WAV with FFmpeg.
+- Transcribing audio locally with Whisper.net.
+- Generating structured meeting minutes with OpenAI GPT.
+- Viewing minutes and transcripts in the React frontend.
+- Downloading transcript and Markdown minutes files.
+- Reviewing processing history.
+- Retrying failed or cancelled jobs.
 
-- ASP.NET Core solution with Clean Architecture-oriented projects.
-- PostgreSQL Docker service.
-- ASP.NET Core API with Swagger/OpenAPI.
-- Basic API health endpoints.
-- EF Core `DbContext` registration.
-- Vite React frontend skeleton.
-- Project docs and backlog.
+No authentication is implemented in this version. The application is intended
+to be run in a trusted local environment.
 
-Still in progress:
+## Processing workflow
 
-- Domain entities and EF mappings.
-- Upload, status, result, retry, and download endpoints.
-- Hangfire background processing.
-- FFmpeg audio processing.
-- Whisper transcription integration.
-- OpenAI GPT meeting-minutes generation.
-- MeetingMind-specific frontend UI.
+```text
+Upload audio
+  -> Validate and save original file
+  -> Create MeetingJob record
+  -> Enqueue Hangfire job
+  -> Return job ID immediately
 
-For the live task list, see [BACKLOG.md](BACKLOG.md).
+MeetingMind.Worker
+  -> Validate stored audio
+  -> Convert to PCM 16-bit, 16 kHz, mono WAV with FFmpeg
+  -> Transcribe locally with Whisper.net
+  -> Save transcript record and text file
+  -> Generate structured minutes with OpenAI GPT
+  -> Save minutes record and Markdown file
+  -> Mark job completed
+```
 
-## Product Goal
+## Technology stack
 
-The MVP is complete when a user can:
+### Frontend
 
-1. Upload a supported audio file.
-2. Receive an immediate job ID.
-3. Track background processing progress.
-4. View the generated transcript.
-5. View structured meeting minutes.
-6. Download transcript and minutes files.
-7. Review processing history.
-8. Retry failed jobs.
-
-## Tech Stack
-
-Backend:
-
-- ASP.NET Core Web API
-- Entity Framework Core
-- PostgreSQL
-- Hangfire
-- Clean Architecture
-- Dependency Injection
-
-Frontend:
-
-- React
+- React 19
+- TypeScript
 - Vite
 - Material UI
 - Axios
 
-Processing and AI:
+### Backend
 
-- FFmpeg for audio conversion/normalization
-- OpenAI Whisper for transcription
-- OpenAI GPT for structured meeting-minutes generation
+- .NET 8
+- ASP.NET Core Web API
+- Entity Framework Core
+- Clean Architecture
+- Dependency Injection
 
-Storage:
+### Processing and persistence
 
-- Local file storage for MVP
-- Designed to be replaceable with S3 or Azure Blob Storage later
+- PostgreSQL 16
+- Hangfire with PostgreSQL storage
+- FFmpeg through FFMpegCore
+- Whisper.net with the local CPU runtime
+- OpenAI .NET SDK for structured meeting-minutes generation
+- Local filesystem storage
 
 ## Architecture
 
-The intended layering is:
-
 ```text
-Frontend
-  -> API
-    -> Application
-      -> Domain
-    -> Infrastructure
+React frontend
+    |
+    v
+MeetingMind.Api
+    |
+    v
+MeetingMind.Application
+    |
+    +-------------------+
+    |                   |
+    v                   v
+MeetingMind.Domain  Application interfaces
+                        ^
+                        |
+MeetingMind.Infrastructure
+    |
+    +-- PostgreSQL / EF Core
+    +-- Hangfire client
+    +-- Local file storage
+
+MeetingMind.Worker
+    |
+    +-- Hangfire server
+    +-- FFmpeg audio processing
+    +-- Whisper.net transcription
+    +-- OpenAI meeting-minutes generation
 ```
 
-Important architecture rules:
+`MeetingMind.Api` and `MeetingMind.Worker` are separate entry points into the
+same Application and Infrastructure layers. Controllers enqueue work and read
+results; they do not run FFmpeg, Whisper, or OpenAI operations directly.
 
-- Controllers should not call FFmpeg, Whisper, OpenAI, Hangfire, or the database
-  directly for business workflows.
-- Application defines interfaces.
-- Infrastructure implements external dependencies.
-- Long-running work must run asynchronously through Hangfire.
-- The API should create a job and return immediately.
-- No authentication is planned for v1.
+External dependencies are accessed through application interfaces such as:
 
-Main processing flow:
+- `IFileStorageService`
+- `IAudioProcessingService`
+- `ITranscriptionService`
+- `IMeetingMinutesService`
+- `IBackgroundJobService`
 
-```text
-Upload audio
-  -> Save original file
-  -> Create MeetingJob
-  -> Enqueue Hangfire job
-  -> Validate audio
-  -> Transcode with FFmpeg
-  -> Transcribe with Whisper
-  -> Generate minutes with OpenAI GPT
-  -> Save transcript and minutes
-  -> Mark job completed
-```
-
-## Repository Structure
+## Repository structure
 
 ```text
-.
-|-- docs/
-|   |-- PRD.md
-|   |-- SAD.md
-|   `-- FSD.md
-|-- frontend/
-|   `-- meetingmind-ui/
-|-- src/
-|   |-- MeetingMind.Api/
-|   |-- MeetingMind.Application/
-|   |-- MeetingMind.Domain/
-|   |-- MeetingMind.Infrastructure/
-|   |-- MeetingMind.Shared/
-|   `-- MeetingMind.Worker/
-|-- AGENTS.md
-|-- BACKLOG.md
-|-- docker-compose.yml
-`-- MeetingMind.sln
+MeetingMind.sln
+docker-compose.yml
+docs/
+  PRD.md
+  SAD.md
+  FSD.md
+frontend/
+  meetingmind-ui/
+src/
+  MeetingMind.Api/             HTTP API and controllers
+  MeetingMind.Application/     Use cases, interfaces, and orchestration
+  MeetingMind.Domain/          Entities, enums, and business rules
+  MeetingMind.Infrastructure/  EF Core, storage, FFmpeg, Whisper, and OpenAI
+  MeetingMind.Shared/          Shared contracts
+  MeetingMind.Worker/          Hangfire server and processing workflow
+tests/
+  MeetingMind.Domain.Tests/
+Storage/
+  Audio/Original/
+  Audio/Processed/
+  Transcript/
+  Minutes/
 ```
 
-## Local Development
+## Prerequisites
 
-Prerequisites:
+Install the following before running MeetingMind:
 
-- .NET 8 SDK
-- Docker Desktop
-- Node.js and npm
-- FFmpeg, once audio processing is implemented
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [Node.js LTS](https://nodejs.org/) with npm
+- [FFmpeg](https://ffmpeg.org/download.html)
+- An OpenAI API key for meeting-minutes generation
 
-Start PostgreSQL:
+The default Worker configuration expects FFmpeg at:
 
-```bash
+```text
+C:\ffmpeg\ffmpeg.exe
+```
+
+Change `AudioProcessing:FfmpegBinaryFolder` in the Worker configuration or set
+the corresponding environment variable if FFmpeg is installed elsewhere.
+
+## Local setup
+
+Run commands from the repository root unless a different directory is shown.
+
+### 1. Start PostgreSQL
+
+Start Docker Desktop, then run:
+
+```powershell
 docker compose up -d
+docker compose ps
 ```
 
-Build the backend:
+The local PostgreSQL container uses:
 
-```bash
+```text
+Host: localhost
+Port: 5432
+Database: meetingmind
+Username: meetingmind_user
+Password: meetingmind_password
+```
+
+These credentials are for local development only.
+
+### 2. Restore tools, apply migrations, build, and test
+
+```powershell
+dotnet tool restore
+dotnet restore
+dotnet ef database update `
+  --project src\MeetingMind.Infrastructure `
+  --startup-project src\MeetingMind.Api
 dotnet build MeetingMind.sln
+dotnet test MeetingMind.sln
 ```
 
-Run the API:
+### 3. Start the API
 
-```bash
-dotnet run --project src/MeetingMind.Api
+Open a new PowerShell window:
+
+```powershell
+cd path\to\MeetingMind
+dotnet run --project src\MeetingMind.Api --launch-profile http
 ```
 
-Run the frontend:
+The API listens on `http://localhost:5059`.
 
-```bash
-cd frontend/meetingmind-ui
+### 4. Start the Worker
+
+Open another PowerShell window and set the OpenAI API key for that process:
+
+```powershell
+cd path\to\MeetingMind
+$env:OPENAI_API_KEY = "your-openai-api-key"
+dotnet run --project src\MeetingMind.Worker
+```
+
+The first transcription may take longer because Whisper.net downloads the
+configured local model when it is not already present. The default model is
+`small` and automatic model download is enabled.
+
+### 5. Install and start the frontend
+
+Open another PowerShell window:
+
+```powershell
+cd path\to\MeetingMind\frontend\meetingmind-ui
 npm install
 npm run dev
 ```
 
-The frontend is currently still the default Vite starter and will be replaced
-as the MVP UI is implemented.
+Open `http://localhost:5173`. The Vite development server proxies `/api`
+requests to `http://localhost:5059`.
+
+If PowerShell blocks `npm.ps1`, use the Windows command wrapper:
+
+```powershell
+npm.cmd install
+npm.cmd run dev
+```
+
+## Local URLs
+
+| Service | URL |
+| --- | --- |
+| Frontend | `http://localhost:5173` |
+| Swagger UI | `http://localhost:5059/swagger` |
+| API health | `http://localhost:5059/health` |
+| Database health | `http://localhost:5059/health/db` |
+| Hangfire dashboard | `http://localhost:5059/hangfire` |
+
+## API endpoints
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | API health check |
+| `GET` | `/health/db` | PostgreSQL health check |
+| `POST` | `/api/meetings/upload` | Upload audio and enqueue a job |
+| `GET` | `/api/meetings/{jobId}/status` | Read job status and progress |
+| `GET` | `/api/meetings/history?skip=0&take=50` | Read processing history |
+| `GET` | `/api/meetings/{jobId}/result` | Read structured minutes |
+| `GET` | `/api/meetings/{jobId}/transcript/download` | Download transcript text |
+| `GET` | `/api/meetings/{jobId}/minutes/download` | Download Markdown minutes |
+| `POST` | `/api/meetings/{jobId}/retry` | Retry a failed or cancelled job |
 
 ## Configuration
 
-The local API currently uses PostgreSQL from `docker-compose.yml`.
+Configuration is loaded through standard .NET configuration providers. Values
+in `appsettings.json` can be overridden with environment variables by replacing
+section separators with double underscores.
 
-Do not commit real secrets. Future OpenAI configuration should be supplied via
-environment variables or .NET user secrets, for example:
+Common settings include:
+
+| Setting | Environment variable | Default |
+| --- | --- | --- |
+| PostgreSQL connection | `ConnectionStrings__DefaultConnection` | Local Docker PostgreSQL |
+| Storage root | `Storage__RootPath` | Path configured in `appsettings.json` |
+| Maximum upload size | `Storage__MaxUploadSizeMb` | `100` MB |
+| FFmpeg location | `AudioProcessing__FfmpegBinaryFolder` | `C:\ffmpeg\ffmpeg.exe` |
+| Whisper model size | `Transcription__ModelSize` | `small` |
+| Whisper model directory | `Transcription__ModelDirectory` | `Models/Whisper` |
+| Automatic model download | `Transcription__AutoDownloadModel` | `true` |
+| Transcription language | `Transcription__Language` | `auto` |
+| OpenAI API key | `OPENAI_API_KEY` or `OpenAI__ApiKey` | Not configured |
+| OpenAI model | `OpenAI__Model` | `gpt-4.1` |
+| Transcript character guard | `OpenAI__MaxTranscriptCharactersForMinutes` | `120000` |
+
+The API and Worker must use the same `Storage__RootPath`. The committed local
+configuration points to `C:\work\Meetingminutes\MeetingMind\Storage`; update
+both application settings or set the environment variable in both processes if
+the repository is located elsewhere.
+
+Never commit real API keys or other secrets. Use environment variables or .NET
+user secrets on the local machine.
+
+## Local storage
+
+The application creates and uses these folders below `Storage__RootPath`:
 
 ```text
-OpenAI__ApiKey
-OpenAI__TranscriptionModel
-OpenAI__MinutesModel
+Audio/Original/    Uploaded source files
+Audio/Processed/   Whisper-ready WAV files
+Transcript/        Transcript text files
+Minutes/           Generated Markdown minutes
 ```
 
-## Documentation
+Stored paths are kept relative to the configured root, and local filesystem
+paths are not returned to the frontend.
 
-Project documents:
+## Build and verification
+
+### Backend
+
+```powershell
+dotnet build MeetingMind.sln
+dotnet test MeetingMind.sln
+```
+
+### Frontend
+
+```powershell
+cd frontend\meetingmind-ui
+npm run lint
+npm run build
+```
+
+If PowerShell blocks `npm.ps1`, replace `npm` with `npm.cmd`.
+
+An end-to-end check should confirm that an uploaded recording reaches
+`Completed`, displays transcript and minutes results, persists in history, and
+allows both result files to be downloaded.
+
+## Troubleshooting
+
+### Frontend displays a 502 error
+
+Confirm the API is running on `http://localhost:5059`. The frontend development
+proxy requires that address.
+
+### Jobs remain queued
+
+Confirm `MeetingMind.Worker` is running and connected to the same PostgreSQL
+database as the API.
+
+### FFmpeg processing fails
+
+Confirm `ffmpeg.exe` exists at the configured path, or set:
+
+```powershell
+$env:AudioProcessing__FfmpegBinaryFolder = "C:\path\to\ffmpeg"
+```
+
+### Whisper model download fails
+
+Confirm the Worker has internet access for its first model download, or set
+`Transcription__ModelPath` to an existing compatible Whisper model file.
+
+### Minutes generation fails
+
+Confirm `OPENAI_API_KEY` is set in the same PowerShell window that starts the
+Worker.
+
+### Database health fails
+
+```powershell
+docker compose ps
+docker compose logs meetingmind-postgres
+```
+
+Then confirm the database migration has been applied.
+
+## Shutting down
+
+Press `Ctrl+C` in the frontend, API, and Worker windows. Stop PostgreSQL with:
+
+```powershell
+docker compose down
+```
+
+Do not add `-v` unless you intentionally want to delete the PostgreSQL data
+volume.
+
+## Documentation
 
 - [Product Requirements Document](docs/PRD.md)
 - [Software Architecture Document](docs/SAD.md)
 - [Functional Specification Document](docs/FSD.md)
 - [Backlog](BACKLOG.md)
-- [Agent/project instructions](AGENTS.md)
-
-## Roadmap
-
-Planned implementation phases:
-
-1. Clean foundation and contracts.
-2. Persistence model and database migration.
-3. Local storage and upload job creation.
-4. Hangfire background job integration.
-5. Background job shell and status tracking.
-6. FFmpeg audio processing.
-7. Whisper transcription integration.
-8. OpenAI GPT meeting-minutes generation.
-9. Retry and processing history.
-10. Frontend MVP.
+- [Agent instructions](AGENTS.md)
 
 ## License
 
-No license has been added yet.
+No license has been added.
