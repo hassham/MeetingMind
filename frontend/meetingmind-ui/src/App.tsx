@@ -24,7 +24,7 @@ import {
   createTheme,
 } from '@mui/material'
 import axios from 'axios'
-import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
+import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 type UploadResponse = {
@@ -137,7 +137,7 @@ function App() {
     )
   }, [history, selectedHistoryItem?.originalFileName, selectedJobId])
 
-  async function loadHistory() {
+  const loadHistory = useCallback(async () => {
     setIsHistoryLoading(true)
     setError(null)
 
@@ -153,20 +153,9 @@ function App() {
     } finally {
       setIsHistoryLoading(false)
     }
-  }
+  }, [])
 
-  async function loadStatus(jobId: string) {
-    const response = await axios.get<JobStatusResponse>(`/api/meetings/${jobId}/status`)
-    setSelectedJob(response.data)
-
-    if (response.data.status === 'Completed') {
-      await loadResults(jobId)
-    }
-
-    return response.data
-  }
-
-  async function loadResults(jobId: string) {
+  const loadResults = useCallback(async (jobId: string) => {
     setIsResultLoading(true)
 
     try {
@@ -184,7 +173,21 @@ function App() {
     } finally {
       setIsResultLoading(false)
     }
-  }
+  }, [])
+
+  const loadStatus = useCallback(
+    async (jobId: string) => {
+      const response = await axios.get<JobStatusResponse>(`/api/meetings/${jobId}/status`)
+      setSelectedJob(response.data)
+
+      if (response.data.status === 'Completed') {
+        await loadResults(jobId)
+      }
+
+      return response.data
+    },
+    [loadResults],
+  )
 
   async function selectHistoryJob(item: HistoryItem) {
     setSelectedHistoryItem(item)
@@ -274,8 +277,12 @@ function App() {
   }
 
   useEffect(() => {
-    void loadHistory()
-  }, [])
+    const timerId = window.setTimeout(() => {
+      void loadHistory()
+    }, 0)
+
+    return () => window.clearTimeout(timerId)
+  }, [loadHistory])
 
   useEffect(() => {
     if (!selectedJobId || !isPolling) {
@@ -287,7 +294,7 @@ function App() {
     }, 5000)
 
     return () => window.clearInterval(timerId)
-  }, [isPolling, selectedJobId])
+  }, [isPolling, loadStatus, selectedJobId])
 
   return (
     <ThemeProvider theme={theme}>

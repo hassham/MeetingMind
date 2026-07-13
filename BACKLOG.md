@@ -75,14 +75,15 @@ Last verified against code: 2026-07-13.
       Notes: Added unauthenticated manual retry endpoint for Failed/Cancelled
       jobs, reset-and-requeue behavior using the same job ID, and paginated
       processing history endpoint.
-- [ ] Phase 10 - Frontend MVP.
-      Status: PARTIAL.
+- [x] Phase 10 - Frontend MVP.
+      Status: DONE.
       Notes: Implemented the React MVP workflow for upload, immediate job
       selection, 5-second polling, history refresh, result tabs, transcript
       viewing, downloads, retry actions, and collapsible processing metadata
       that keeps Minutes/Transcript near the top of the selected-job panel.
-      The production build and responsive result layout are verified. Full
-      lint verification is pending an existing React effect lint fix.
+      Frontend lint, the production build, and the responsive result layout
+      are verified. The developer confirmed two successful end-to-end audio
+      tests producing transcripts and meeting minutes on 2026-07-13.
 
 ## Verified current scaffold
 
@@ -121,11 +122,10 @@ Last verified against code: 2026-07-13.
       Status: DONE.
       Notes: Replaced the default Vite starter screen with a MeetingMind UI
       shell.
-- [ ] Frontend dependencies are incomplete for the documented stack.
-      Status: PARTIAL.
-      Notes: `package.json` now lists Material UI, Emotion, MUI icons, and
-      Axios. `npm` is not available on PATH in the current shell, so
-      `package-lock.json` and `node_modules` still need `npm install`.
+- [x] Frontend dependencies are complete for the documented stack.
+      Status: DONE.
+      Notes: Material UI, Emotion, MUI icons, and Axios are installed;
+      `package-lock.json` is present and the production build is verified.
 - [x] Tests are not scaffolded.
       Status: DONE.
       Notes: Added `tests/MeetingMind.Domain.Tests` and included it in
@@ -173,7 +173,7 @@ Last verified against code: 2026-07-13.
 - [x] FR-008 View/download transcript and minutes.
       Status: DONE for backend API.
       Notes: Transcript download, minutes result, and minutes Markdown download
-      endpoints exist. Frontend result screens remain TODO under Frontend.
+      endpoints exist, with completed frontend result tabs and download actions.
 - [x] FR-009 Retry failed jobs: no auth check, any user.
       Status: DONE for backend API.
       Notes: `POST /api/meetings/{jobId}/retry` allows Failed/Cancelled jobs,
@@ -257,34 +257,40 @@ Last verified against code: 2026-07-13.
       Notes: `package.json`, `package-lock.json`, and `node_modules` are
       present with Material UI, Emotion, MUI icons, and Axios. Production build
       verified 2026-07-13 using the locally installed Node/npm runtime.
-- [ ] Upload UI.
-      Status: PARTIAL.
+- [x] Upload UI.
+      Status: DONE.
       Notes: Implemented file selection and upload to `/api/meetings/upload`.
-      Pending frontend build/browser verification.
-- [ ] Progress polling / status display.
-      Status: PARTIAL.
+      Verified through two successful end-to-end audio tests.
+- [x] Progress polling / status display.
+      Status: DONE.
       Notes: Implemented immediate job selection and 5-second polling while
-      Queued/Processing. Pending frontend build/browser verification.
-- [ ] Transcript + minutes view.
-      Status: PARTIAL.
+      Queued/Processing and verified in the completed frontend workflow.
+- [x] Transcript + minutes view.
+      Status: DONE.
       Notes: Implemented selected-job detail with Minutes/Transcript tabs,
       result API loading, transcript text loading from the download endpoint,
       and collapsed processing-date metadata so results remain prominent.
-      Production build and desktop/mobile browser layout verified 2026-07-13.
-- [ ] Download buttons.
-      Status: PARTIAL.
-      Notes: Implemented transcript and minutes download buttons. Pending
-      frontend build/browser verification.
-- [ ] Processing history view.
-      Status: PARTIAL.
-      Notes: Implemented first-50 history load and refresh action. Pending
-      frontend build/browser verification.
-- [ ] Retry failed job action.
-      Status: PARTIAL.
+      Production build, desktop/mobile layout, and generated results verified.
+- [x] Download buttons.
+      Status: DONE.
+      Notes: Implemented transcript and minutes download buttons and accepted
+      as part of the completed frontend MVP.
+- [x] Processing history view.
+      Status: DONE.
+      Notes: Implemented first-50 history load, selection, and refresh action.
+- [x] Retry failed job action.
+      Status: DONE.
       Notes: Implemented retry actions in history rows and selected job detail.
-      Pending frontend build/browser verification.
 
 ## Known gaps / doc mismatches to revisit
+
+- [x] Frontend React effect lint cleanup.
+      Status: DONE.
+      Notes: Stabilized history/result/status loaders, made initial history
+      loading effect-safe, and completed polling dependencies. Frontend lint
+      and production build pass on 2026-07-13. Browser verification confirmed
+      initial history loading and graceful API-unavailable handling; prior
+      end-to-end tests cover the unchanged completed-job workflow.
 
 - [x] Queue decision mismatch.
       Status: DONE.
