@@ -7,7 +7,7 @@ re-explaining state. Keep completed items here briefly, then move them to the
 
 Status legend: `TODO` | `IN PROGRESS` | `BLOCKED` | `PARTIAL` | `DONE`
 
-Last verified against code: 2026-07-12.
+Last verified against code: 2026-07-13.
 
 ## Current focus
 
@@ -76,9 +76,13 @@ Last verified against code: 2026-07-12.
       jobs, reset-and-requeue behavior using the same job ID, and paginated
       processing history endpoint.
 - [ ] Phase 10 - Frontend MVP.
-      Status: TODO.
-      Notes: Next active focus. Build upload, status polling, transcript/minutes
-      viewing, downloads, retry, and history flows in the React app.
+      Status: PARTIAL.
+      Notes: Implemented the React MVP workflow for upload, immediate job
+      selection, 5-second polling, history refresh, result tabs, transcript
+      viewing, downloads, retry actions, and collapsible processing metadata
+      that keeps Minutes/Transcript near the top of the selected-job panel.
+      The production build and responsive result layout are verified. Full
+      lint verification is pending an existing React effect lint fix.
 
 ## Verified current scaffold
 
@@ -248,22 +252,37 @@ Last verified against code: 2026-07-12.
 
 - [x] Replace Vite starter screen with MeetingMind application shell.
       Status: DONE.
-- [ ] Install/add documented frontend stack dependencies: Material UI and Axios.
-      Status: PARTIAL.
-      Notes: Dependencies are listed in `package.json`; run `npm install` once
-      Node/npm is available to update `package-lock.json` and install packages.
+- [x] Install/add documented frontend stack dependencies: Material UI and Axios.
+      Status: DONE.
+      Notes: `package.json`, `package-lock.json`, and `node_modules` are
+      present with Material UI, Emotion, MUI icons, and Axios. Production build
+      verified 2026-07-13 using the locally installed Node/npm runtime.
 - [ ] Upload UI.
-      Status: TODO.
+      Status: PARTIAL.
+      Notes: Implemented file selection and upload to `/api/meetings/upload`.
+      Pending frontend build/browser verification.
 - [ ] Progress polling / status display.
-      Status: TODO.
+      Status: PARTIAL.
+      Notes: Implemented immediate job selection and 5-second polling while
+      Queued/Processing. Pending frontend build/browser verification.
 - [ ] Transcript + minutes view.
-      Status: TODO.
+      Status: PARTIAL.
+      Notes: Implemented selected-job detail with Minutes/Transcript tabs,
+      result API loading, transcript text loading from the download endpoint,
+      and collapsed processing-date metadata so results remain prominent.
+      Production build and desktop/mobile browser layout verified 2026-07-13.
 - [ ] Download buttons.
-      Status: TODO.
+      Status: PARTIAL.
+      Notes: Implemented transcript and minutes download buttons. Pending
+      frontend build/browser verification.
 - [ ] Processing history view.
-      Status: TODO.
+      Status: PARTIAL.
+      Notes: Implemented first-50 history load and refresh action. Pending
+      frontend build/browser verification.
 - [ ] Retry failed job action.
-      Status: TODO.
+      Status: PARTIAL.
+      Notes: Implemented retry actions in history rows and selected job detail.
+      Pending frontend build/browser verification.
 
 ## Known gaps / doc mismatches to revisit
 
