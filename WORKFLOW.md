@@ -229,7 +229,9 @@ When the developer sends the proceed prompt, the agent:
 2. Extracts all `[x]` selections and Notes
 3. Handles any `Clarification needed` items by proposing a recommendation based on the Notes and asking for a simple confirm/override
 4. Proceeds to Phase 2 — Confirmation (Plan Summary)
-5. Updates `QUESTIONS.md` status header to `# Status: ANSWERED` and archives it (does not delete)
+5. Updates the `QUESTIONS.md` status header to `# Status: ANSWERED`, renames
+   it for the task, and moves it into the appropriate delivery-cycle folder
+   under `docs/archive/phaseN/` (does not delete it)
 
 ---
 
@@ -247,17 +249,21 @@ When the developer sends the proceed prompt, the agent:
 
 ---
 
-### Naming Convention for QUESTIONS.md archives
+### Naming Convention and location for QUESTIONS.md archives
 
-Once answered, the agent renames the file before the next task generates a new one:
+Once answered, the agent renames and moves the file before the next task
+generates a new active `QUESTIONS.md`:
 
 ```
-QUESTIONS_phase4_hangfire.md     ← answered, kept for reference
-QUESTIONS_phase5_transcription.md
-QUESTIONS.md                     ← always the active/current file
+docs/archive/phase1/QUESTIONS_phase4_hangfire.md
+docs/archive/phase1/QUESTIONS_phase5_transcription.md
+QUESTIONS.md                     ← active/current file only
 ```
 
-This gives you a full decision log across all phases.
+Use the archive folder for the current delivery cycle (`phase1`, `phase2`, and
+so on). Never move an unanswered active `QUESTIONS.md` into the archive. This
+keeps a complete decision log without filling the repository root with closed
+records.
 
 ---
 
@@ -376,5 +382,5 @@ When beginning any session, confirm:
 
 ---
 
-*Last updated: Phase 4 — Hangfire Integration*
+*Last updated: 2026-07-15 — Phase 1 archive organization*
 *Maintained by: Hasham | MeetingMind AI*
