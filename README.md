@@ -137,7 +137,10 @@ src/
   MeetingMind.Shared/          Shared contracts
   MeetingMind.Worker/          Hangfire server and processing workflow
 tests/
-  MeetingMind.Domain.Tests/
+  MeetingMind.Unit.Tests/                    Domain and Application unit tests
+  MeetingMind.Api.IntegrationTests/          HTTP contracts with disposable PostgreSQL
+  MeetingMind.Infrastructure.IntegrationTests/ PostgreSQL repository behavior
+  MeetingMind.Worker.Tests/                  Processing orchestration with test doubles
 Storage/
   Audio/Original/
   Audio/Processed/
@@ -318,9 +321,16 @@ paths are not returned to the frontend.
 
 ### Backend
 
+Docker Desktop must be running. API and persistence integration tests create
+disposable PostgreSQL 16 containers and never use the normal MeetingMind
+database.
+
 ```powershell
 dotnet build MeetingMind.sln
 dotnet test MeetingMind.sln
+dotnet test MeetingMind.sln `
+  --collect:"XPlat Code Coverage" `
+  --results-directory artifacts/test
 ```
 
 ### Frontend
@@ -328,6 +338,8 @@ dotnet test MeetingMind.sln
 ```powershell
 cd frontend\meetingmind-ui
 npm run lint
+npm test
+npm run test:coverage
 npm run build
 ```
 

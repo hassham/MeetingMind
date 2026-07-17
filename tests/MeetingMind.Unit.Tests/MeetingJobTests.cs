@@ -1,7 +1,7 @@
 using MeetingMind.Domain.Entities;
 using MeetingMind.Domain.Enums;
 
-namespace MeetingMind.Domain.Tests;
+namespace MeetingMind.Unit.Tests;
 
 public class MeetingJobTests
 {
