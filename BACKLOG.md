@@ -48,21 +48,68 @@ Phase 2 is complete only when:
 - Durable requirements and operating documentation match the implementation.
 - No Phase 2 item below remains `TODO`, `PARTIAL`, `IN PROGRESS`, or `BLOCKED`.
 
+### Work-package acceptance criteria
+
+- **P2-01:** Durable documents agree that Phase 2 is trusted-local hardening,
+  transcription uses local Whisper.net, the Worker executes Hangfire jobs, no
+  separate transcript-cleanup stage exists, and automatic retry remains pending
+  until P2-05. Searches find no stale claim that MediatR/CQRS or OpenAI Whisper
+  is the implemented architecture.
+- **P2-02:** Standard repository commands execute unit, API contract,
+  PostgreSQL persistence, Worker-pipeline, and frontend tests. Tests do not call
+  real FFmpeg, Whisper, OpenAI, or production storage, and each critical
+  workflow has at least one success and one failure assertion.
+- **P2-03:** A fresh local checkout can configure API and Worker without editing
+  committed files; no committed setting contains a developer-specific absolute
+  path or real secret; missing or invalid required settings fail startup with a
+  message naming the setting; API and Worker storage roots are proven equal in
+  the documented setup.
+- **P2-04:** Status and history return the same documented duration unit and
+  semantics for queued, active, terminal, and manually retried jobs; live and
+  final duration render in the frontend; automated tests cover every status and
+  retry reset.
+- **P2-05:** Configured transient failures demonstrate retry and eventual
+  success; permanent failures run once; exhausted transient failures end in a
+  stable failed state; manual retry still succeeds where eligible; attempt and
+  delay settings contain no hard-coded policy in the handler.
+- **P2-06:** Inputs at and around every chunk boundary pass automated tests; a
+  transcript above the single-pass threshold completes through multiple partial
+  calls and one final aggregation; a short transcript remains single-pass; all
+  eight minutes sections survive aggregation without deterministic duplicates;
+  partial-call failure and retry behavior is tested.
+- **P2-07:** Logs identify job, stage, outcome, and elapsed time without secrets,
+  transcripts, provider payloads, or physical paths; readiness detects each
+  locally verifiable dependency failure; retention tests prove active artifacts
+  and files outside the storage root cannot be deleted.
+- **P2-08:** Frontend tests cover duration, automatic/manual retry state, page
+  navigation, selection, and active polling; supported error states have
+  actionable messages; keyboard-only operation and automated accessibility
+  checks find no critical violations in the primary workflow.
+- **P2-09:** Every command in the completion gate passes, and the recorded local
+  end-to-end evidence covers short and long meetings, transient recovery,
+  permanent failure, manual retry, history, results, and both downloads.
+
+## Current focus
+
+P2-02 is next. It requires task-specific discovery and approval of any proposed
+test packages before implementation.
+
 ## Ordered Phase 2 work packages
 
 ### P2-01 - Reconcile requirements and architecture
 
-- [ ] Update `AGENTS.md`, `docs/PRD.md`, `docs/FSD.md`, and `docs/SAD.md` to
+- [x] Update `AGENTS.md`, `WORKFLOW.md`, `docs/PRD.md`, `docs/FSD.md`, and
+      `docs/SAD.md` to
       describe local Whisper.net, the separate Worker entry point, and the
       implemented Clean Architecture dependency direction.
-      Status: TODO.
-- [ ] Resolve contradictions around transcript cleanup, automatic retries,
+      Status: DONE. Completed: 2026-07-17.
+- [x] Resolve contradictions around transcript cleanup, automatic retries,
       duration, local-only security, and the meaning of cloud Phase 2 in the
       older specifications.
-      Status: TODO.
-- [ ] Record measurable acceptance criteria for every remaining Phase 2 work
+      Status: DONE. Completed: 2026-07-17.
+- [x] Record measurable acceptance criteria for every remaining Phase 2 work
       package before its implementation begins.
-      Status: TODO.
+      Status: DONE. Completed: 2026-07-17.
 
 ### P2-02 - Establish the automated verification foundation
 

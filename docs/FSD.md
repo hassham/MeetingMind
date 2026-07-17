@@ -1,576 +1,240 @@
-**Functional Specification Document (FSD)**
+# Functional Specification Document
 
-**Project Title**
+**Product:** MeetingMind AI
 
-AI Meeting Minutes Generator
+**Version:** 2.0
 
-**Version:** 1.0
+**Status:** Active Phase 2 specification
 
-**Document Status:** Draft
+**Last reconciled with code:** 2026-07-17
 
-**Prepared By:** Hasham Ahmad
+## 1. Purpose and boundary
 
-**1. Purpose**
+MeetingMind accepts a supported audio recording, creates a persistent job,
+processes it asynchronously, and makes a transcript and structured meeting
+minutes available for viewing and download.
 
-The purpose of this application is to automate the creation of
-professional meeting minutes from an uploaded meeting recording.
+Phase 2 remains a trusted local deployment. Authentication, user ownership,
+multi-tenancy, cloud infrastructure, and public access are excluded.
 
-The application allows users to upload an audio recording of a meeting
-through a web interface. The system processes the audio asynchronously,
-generates a transcript using an AI transcription service, produces
-structured meeting minutes using a Large Language Model (LLM), and makes
-the final output available for download.
+## 2. Runtime components
 
-The system is designed to be modular, scalable, and cloud-ready while
-initially running as a local application.
+- React, TypeScript, Material UI, Axios, and Vite frontend.
+- ASP.NET Core Web API for upload, enqueueing, status, history, results,
+  downloads, retry, health checks, Swagger, and the local Hangfire dashboard.
+- A separate .NET Worker containing the Hangfire server and processing handler.
+- PostgreSQL for MeetingMind data and Hangfire storage.
+- Local filesystem storage behind `IFileStorageService`.
+- FFmpeg behind `IAudioProcessingService`.
+- Local Whisper.net behind `ITranscriptionService`.
+- OpenAI GPT behind `IMeetingMinutesService`.
 
-**2. Objectives**
+The API never executes FFmpeg, Whisper, or GPT processing. The Worker never
+bypasses Application interfaces to reach infrastructure dependencies.
 
--   Eliminate manual note-taking.
+## 3. Functional requirements
 
--   Generate professional meeting minutes automatically.
+### FR-001 — Upload meeting
 
--   Demonstrate modern software architecture.
+The user can upload one MP3, WAV, M4A, or AAC audio file. The system validates
+filename safety, extension, MIME type, non-empty content, and configurable size
+before accepting it. Stored internal names are generated safely, and no local
+path is returned to the user.
 
--   Build an application that can later migrate to a cloud-native
-    architecture with minimal code changes.
+### FR-002 — Create and enqueue processing job
 
-**3. Scope**
+After validation, the API saves the original audio, creates a `MeetingJob`,
+enqueues `ProcessMeetingAsync(jobId)` through `IBackgroundJobService`, stores
+the Hangfire job ID, and returns HTTP 202 with the MeetingMind job ID, status,
+and stage. It does not wait for processing.
 
-**Included**
+### FR-003 — Background processing
 
--   Audio upload
+The Worker executes this pipeline independently of the user session:
 
--   Background processing
+1. Load and validate the persisted job and audio reference.
+2. Convert audio to PCM 16-bit, 16 kHz, mono WAV through FFmpeg.
+3. Generate a transcript locally through Whisper.net.
+4. Persist the transcript record and text artifact.
+5. Generate structured minutes through OpenAI GPT.
+6. Persist the minutes record and Markdown artifact.
+7. Mark the job completed.
 
--   Audio transcoding
+There is no separate transcript-cleanup stage in the current pipeline. Text
+normalization needed for chunk boundaries may be introduced as part of Phase 2
+long-meeting orchestration, but it must not be represented as an independent
+external processing provider.
 
--   Speech-to-text transcription
+### FR-004 — Job status and duration
 
--   AI-generated meeting minutes
+Supported statuses are `Queued`, `Processing`, `Completed`, `Failed`, and
+`Cancelled`. Supported stages are `Uploaded`, `Validating`, `Transcoding`,
+`Transcribing`, `GeneratingMinutes`, `SavingResults`, `Completed`, and `Failed`.
 
--   Job progress tracking
+Each job maintains progress from 0 to 100, current stage, a sanitized error
+when applicable, creation/update timestamps, and optional start/completion
+timestamps. Phase 2 must expose a documented processing duration through status
+and history responses and display it in the frontend. Retry must reset timing in
+accordance with the approved duration semantics.
 
--   Transcript storage
+### FR-005 — Audio transcoding
 
--   Meeting minutes storage
+FFmpeg converts accepted input to the configured standard format before
+transcription. Conversion failures must identify the processing stage without
+exposing unsafe paths or raw command details to the frontend.
 
--   Retry failed jobs
+### FR-006 — Local transcription
 
--   Administrative dashboard (no authentication/authorization in v1 --
-    accessible to any user of the deployment)
+The Worker uses Whisper.net locally. Model size, model directory or explicit
+model path, automatic model download, and language are configurable. A missing
+model may be downloaded only when automatic download is enabled.
 
--   Download generated meeting minutes
+### FR-007 — Structured meeting minutes
 
-**Excluded (Version 1)**
+Minutes contain:
 
--   Video processing
+- Title and executive summary.
+- Attendees, when identifiable.
+- Discussion points.
+- Decisions.
+- Action items with description and optional owner and due date.
+- Risks or blockers.
+- Next steps.
 
--   Multi-language translation
+Short transcripts use one structured GPT request. Transcripts above the
+configured single-pass threshold must use bounded chunks, partial structured
+results, and hierarchical final aggregation. Merge behavior must preserve the
+schema and avoid deterministic duplicates.
 
--   User authentication
+### FR-008 — View and download results
 
--   Multi-tenant support
+For completed jobs, users can view structured minutes and transcript content
+and download a plain-text transcript and Markdown minutes artifact. Missing or
+not-yet-available results return a safe not-found response.
 
--   Real-time meeting transcription
+### FR-009 — Retry failed processing
 
--   Live meeting recording
+Manual retry remains available for `Failed` and `Cancelled` jobs and reuses the
+same MeetingMind job ID and original upload. It resets processing state and
+stores the new Hangfire job ID.
 
--   Email notifications
+Phase 2 adds configured automatic retries for classified transient failures.
+Permanent failures must not be retried automatically. When automatic attempts
+are exhausted, the job must retain its final failed stage and sanitized error
+and remain eligible for manual retry when the original input is still present.
 
--   Calendar integrations
+### FR-010 — Processing history
 
-**4. Technology Stack**
+The API returns persisted jobs newest first with `skip` and bounded `take`
+pagination. History includes filename, status, stage, progress, sanitized error,
+timestamps, and Phase 2 duration. The frontend must provide usable pagination
+without breaking selected-job polling.
 
-**Frontend**
+## 4. API contract
 
--   React
+| Method | Endpoint | Successful response |
+| --- | --- | --- |
+| `POST` | `/api/meetings/upload` | `202 Accepted` with job ID, status, and stage |
+| `GET` | `/api/meetings/{jobId}/status` | Current status, stage, progress, error, and Phase 2 duration |
+| `GET` | `/api/meetings/history?skip=0&take=50` | Page metadata and newest-first history items |
+| `GET` | `/api/meetings/{jobId}/result` | Structured minutes for a completed job |
+| `GET` | `/api/meetings/{jobId}/transcript/download` | Plain-text transcript artifact |
+| `GET` | `/api/meetings/{jobId}/minutes/download` | Markdown minutes artifact |
+| `POST` | `/api/meetings/{jobId}/retry` | `202 Accepted` for an eligible manual retry |
+| `GET` | `/health` | API liveness |
+| `GET` | `/health/db` | Database check; expanded readiness is a Phase 2 deliverable |
 
--   Material UI
+Unknown jobs return 404. Invalid uploads return 400. A retry of a job whose
+status is not retryable returns 409.
 
--   Axios
+## 5. Persistence model
 
-**Backend**
+### MeetingJob
 
--   ASP.NET Core Web API
+`Id`, `OriginalFileName`, `OriginalFilePath`, `ProcessedFilePath`, `Status`,
+`Stage`, `Progress`, `ErrorMessage`, `HangfireJobId`, `CreatedAt`, `StartedAt`,
+`CompletedAt`, and `UpdatedAt`.
 
--   Entity Framework Core
+### MeetingTranscript
 
--   Clean Architecture
+One transcript per job: `Id`, `MeetingJobId`, `TranscriptText`,
+`TranscriptFilePath`, and `CreatedAt`.
 
--   Dependency Injection
+### MeetingMinutes
 
-**Database**
+One minutes record per job: `Id`, `MeetingJobId`, `Title`, `Summary`,
+`DecisionsJson`, `ActionItemsJson`, `RisksJson`, `NextStepsJson`,
+`FullMinutesJson`, `MinutesFilePath`, and `CreatedAt`.
 
--   PostgreSQL (Docker)
+Stored file references are relative to the configured storage root. Physical
+paths are infrastructure details and must not enter frontend contracts.
 
-**Background Processing**
+## 6. Error and retry behavior
 
--   Hangfire for queueing, background job execution, retries, and workflow orchestration
+The system distinguishes:
 
-**Audio Processing**
+- Validation or permanent failures, such as unsupported input, corrupted audio,
+  missing stored input, or invalid configuration.
+- Transient failures, such as eligible timeouts, rate limiting, temporary
+  network interruption, or transient persistence/provider faults.
 
--   FFmpeg
+Every final failure records job status, stage, progress, a bounded sanitized
+error, and logs containing the job ID and exception context. Routine logs must
+not include full transcripts, secrets, provider payloads, or local paths.
 
-**AI Services**
+P2-05 defines the concrete exception classification, attempt count, and delay
+policy before retry implementation begins.
 
--   OpenAI Whisper API
+## 7. Non-functional requirements
 
--   OpenAI GPT
+### Performance
 
-**Storage**
+- The upload request performs validation, storage, persistence, and enqueueing
+  only; no long-running media or AI processing occurs in the request.
+- The frontend polls active jobs without creating overlapping polling loops.
+- Chunk and aggregation sizes are configurable and bounded.
 
-Local File Storage
+### Reliability
 
-Storage/
+- A successful upload is not lost when the browser closes.
+- Status transitions and persisted artifacts remain internally consistent.
+- Automatic retry is bounded and limited to transient failures.
+- Cleanup never removes active-job data.
 
-Audio/
+### Security and privacy
 
-Transcript/
+- Validate extension, MIME type, size, and filename safety.
+- Prevent path traversal and storage-root escape.
+- Keep secrets outside committed configuration.
+- Do not expose local paths or sensitive diagnostic details.
+- Keep the application and Hangfire dashboard on a trusted local machine.
 
-Minutes/
+### Maintainability
 
-**5. System Architecture**
+- Domain has no infrastructure dependencies.
+- Application defines use cases and infrastructure interfaces.
+- Infrastructure implements persistence, storage, media, transcription, and
+  GPT integrations.
+- API and Worker are separate entry points and remain thin composition and
+  delivery layers.
 
-User
+## 8. Verification requirements
 
-↓
+- Unit tests cover domain and Application behavior.
+- API contract tests cover successful and invalid request paths.
+- PostgreSQL integration tests verify persistence and retry state transitions.
+- Worker tests use test doubles for FFmpeg, Whisper, OpenAI, and storage.
+- Frontend tests cover upload, polling, history, result, duration, and retry
+  states.
+- Real provider and media dependencies are used only in the documented local
+  end-to-end acceptance run.
 
-React Frontend
+Measurable acceptance criteria for each Phase 2 work package are maintained in
+[`../BACKLOG.md`](../BACKLOG.md).
 
-↓
+## 9. Future enhancements
 
-ASP.NET Core Web API
-
-↓
-
-PostgreSQL
-
-↓
-
-Hangfire
-
-↓
-
-FFmpeg
-
-↓
-
-Whisper API
-
-↓
-
-OpenAI GPT
-
-↓
-
-Meeting Minutes
-
-↓
-
-Database + File Storage
-
-**6. Functional Requirements**
-
-**FR-001 Upload Meeting**
-
-The user shall be able to upload an audio recording.
-
-Supported formats:
-
--   MP3
-
--   WAV
-
--   M4A
-
--   AAC
-
-Maximum file size shall be configurable.
-
-**FR-002 Create Processing Job**
-
-Upon upload:
-
--   Save audio file
-
--   Create database record
-
--   Generate Job ID
-
--   Queue background job
-
--   Return Job ID immediately
-
-**FR-003 Background Processing**
-
-Background processing shall execute independently of the user session.
-
-Processing stages:
-
-1.  Validate audio
-
-2.  Transcode audio
-
-3.  Generate transcript
-
-4.  Clean transcript
-
-5.  Generate meeting minutes
-
-6.  Save output
-
-7.  Mark job completed
-
-**FR-004 Job Status**
-
-The system shall support:
-
--   Queued
-
--   Processing
-
--   Completed
-
--   Failed
-
-Each job shall maintain:
-
--   Progress percentage
-
--   Current processing stage
-
--   Error message (if failed)
-
--   Processing duration
-
-**FR-005 Audio Transcoding**
-
-The system shall convert uploaded audio into a standardized format
-before transcription.
-
-**FR-006 Transcription**
-
-The system shall send audio to the transcription provider and retrieve
-the generated transcript.
-
-**FR-007 Meeting Minutes Generation**
-
-The system shall generate structured meeting minutes containing:
-
--   Meeting title
-
--   Executive summary
-
--   Attendees (if identifiable)
-
--   Discussion topics
-
--   Decisions made
-
--   Action items
-
--   Risks / blockers
-
--   Next steps
-
-**FR-008 View Results**
-
-Users shall be able to:
-
--   View transcript
-
--   View meeting minutes
-
--   Download transcript
-
--   Download meeting minutes
-
-**FR-009 Retry Failed Jobs**
-
-Any users shall be able to retry failed jobs without re-uploading the
-audio.
-
-**FR-010 Processing History**
-
-The system shall maintain historical records for all processing jobs.
-
-**7. Non-Functional Requirements**
-
-**Performance**
-
--   Upload response \< 3 seconds
-
--   API returns immediately after job creation
-
--   Long-running operations execute asynchronously
-
-**Reliability**
-
--   Automatic retries for transient failures
-
--   Failed jobs recorded with error details
-
--   No data loss after successful upload
-
-**Scalability**
-
-Architecture shall support future migration to:
-
--   AWS
-
--   Azure
-
-without changes to business logic.
-
-**Maintainability**
-
-The solution shall follow:
-
--   SOLID Principles
-
--   Clean Architecture
-
--   Repository Pattern
-
--   Dependency Injection
-
--   Service Abstraction
-
-**Security**
-
--   Validate uploaded files
-
--   Restrict supported formats
-
--   Secure API keys
-
--   Validate file size
-
--   Prevent path traversal attacks
-
-**8. Database Design**
-
-**MeetingJob**
-
-  -----------------------------------------------------------------------
-  **Field**                    **Description**
-  ---------------------------- ------------------------------------------
-  Id                           Unique Identifier
-
-  FileName                     Uploaded file
-
-  Status                       Current status
-
-  Progress                     Percentage complete
-
-  CurrentStage                 Current processing step
-
-  TranscriptPath               Transcript location
-
-  MinutesPath                  Minutes location
-
-  ErrorMessage                 Failure reason
-
-  CreatedDate                  Timestamp
-
-  CompletedDate                Timestamp
-  -----------------------------------------------------------------------
-
-**MeetingTranscript**
-
-  -----------------------------------------------------------------------
-  **Field**                  **Description**
-  -------------------------- --------------------------------------------
-  Id                         Unique Identifier
-
-  JobId                      Related Job
-
-  Transcript                 Transcript Text
-  -----------------------------------------------------------------------
-
-**MeetingMinutes**
-
-  -----------------------------------------------------------------------
-  **Field**              **Description**
-  ---------------------- ------------------------------------------------
-  Id                     Unique Identifier
-
-  JobId                  Related Job
-
-  Summary                Executive Summary
-
-  Decisions              Decisions
-
-  ActionItems            Action Items
-
-  Risks                  Risks
-
-  NextSteps              Next Steps
-
-  MinutesJson            Complete Structured Output
-  -----------------------------------------------------------------------
-
-**9. User Workflow**
-
-Upload Audio
-
-↓
-
-Create Job
-
-↓
-
-Return Job ID
-
-↓
-
-Queue Background Job
-
-↓
-
-Validate Audio
-
-↓
-
-Transcode Audio
-
-↓
-
-Generate Transcript
-
-↓
-
-Generate Meeting Minutes
-
-↓
-
-Save Results
-
-↓
-
-Update Status
-
-↓
-
-User Views Results
-
-**10. Error Handling**
-
-The system shall handle:
-
--   Invalid file format
-
--   Corrupted audio
-
--   FFmpeg failures
-
--   Whisper API failures
-
--   LLM failures
-
--   Database failures
-
--   Network failures
-
-Each failure shall:
-
--   Record detailed logs
-
--   Update job status
-
--   Allow retry
-
-**11. Future Enhancements**
-
--   User authentication
-
--   Multi-user support
-
--   Teams and organizations
-
--   Speaker diarization
-
--   Multiple LLM providers
-
--   AWS cloud deployment
-
--   Azure deployment
-
--   S3 / Azure Blob Storage
-
--   Step Functions / SQS migration
-
--   Email notifications
-
--   Meeting templates
-
--   Microsoft Teams integration
-
--   Zoom integration
-
--   Google Meet integration
-
-**12. Success Criteria**
-
-The project will be considered successful when it can:
-
--   Accept meeting audio uploads.
-
--   Process recordings asynchronously.
-
--   Generate accurate transcripts.
-
--   Produce structured meeting minutes.
-
--   Track job progress.
-
--   Recover from failures.
-
--   Retry failed jobs.
-
--   Be migrated to a cloud architecture with minimal changes to the
-    business logic.
-
-**13. Architecture Evolution**
-
-**Phase 1 (Current)**
-
--   React
-
--   ASP.NET Core Web API
-
--   PostgreSQL
-
--   Hangfire
-
--   FFmpeg
-
--   OpenAI Whisper API
-
--   OpenAI GPT
-
--   Local File Storage
-
-**Phase 2 (Cloud)**
-
--   CloudFront
-
--   S3
-
--   API Gateway
-
--   Lambda / ECS
-
--   Amazon RDS PostgreSQL
-
--   Step Functions
-
--   Amazon S3
-
--   Amazon Transcribe (optional)
-
--   Amazon Bedrock (optional)
-
-The business logic and domain layer shall remain unchanged between Phase
-1 and Phase 2, with only infrastructure implementations being replaced.
+Authentication, user ownership, multi-tenancy, cloud hosting, cloud storage and
+orchestration, speaker diarization, meeting integrations, notifications,
+multiple providers, and meeting-intelligence features are deferred to future
+delivery cycles.

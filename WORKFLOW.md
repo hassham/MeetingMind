@@ -310,31 +310,33 @@ These rules are permanent and apply on top of the general protocol.
 - **Database**: PostgreSQL via EF Core — always use migrations, never modify DB directly
 - **Background Jobs**: Hangfire — all long-running work (transcription, minutes generation) runs as Hangfire jobs
 - **File Storage**: Local filesystem (configurable path) — no cloud storage unless explicitly decided
-- **AI Services**: OpenAI Whisper (transcription) + GPT (minutes generation) — always use interfaces, never call OpenAI SDK directly from a job
+- **AI Services**: local Whisper.net (transcription) + OpenAI GPT (minutes generation) — always use interfaces, never call provider SDKs directly from a job
 - **Frontend**: React — coordinate with backend API contracts before building UI
 
 ### Naming & Structure Conventions
 - Follow existing entity naming in `Domain/Entities/`
-- Application layer: Commands and Queries via MediatR (CQRS pattern)
+- Application layer: use-case services and provider/repository interfaces; do not introduce MediatR/CQRS unless it is explicitly approved for a concrete task
 - Infrastructure layer: EF Core repositories + external service implementations
-- API layer: Controllers thin — delegate everything to MediatR handlers
+- API layer: Controllers thin — delegate to Application-layer use-case services
 
 ### Phase Discipline
 - Never implement work from a future phase unless explicitly asked
 - Always check `BACKLOG.md` to confirm what phase is active before starting
 - Mark tasks as complete in `BACKLOG.md` after the Completion Report
 
-### Hangfire-Specific Rules (Phase 4+)
-- Every job must have: an interface in Application layer, implementation in Infrastructure layer
+### Hangfire-Specific Rules
+- Every job contract must live in Application; the active meeting-processing
+  handler lives in the Worker entry point and uses Application abstractions
 - Jobs must log start, progress, and completion
 - Jobs must handle failure gracefully — update meeting status to `Failed` with error detail
 - Never hard-code retry counts — use configuration
 - Ask before adding any new Hangfire queue or job type not in the backlog
 
-### OpenAI Integration Rules
+### AI Integration Rules
 - Never expose API key in code — always read from configuration/environment
 - Always wrap OpenAI calls in try/catch with meaningful error messages
-- Whisper and GPT calls must be in separate service classes
+- Local Whisper.net transcription and OpenAI GPT generation must remain in
+  separate service classes behind their Application interfaces
 - If a call fails, the Hangfire job must update the meeting status and not silently swallow the error
 
 ---
@@ -382,5 +384,5 @@ When beginning any session, confirm:
 
 ---
 
-*Last updated: 2026-07-15 — Phase 1 archive organization*
+*Last updated: 2026-07-17 — Phase 2 architecture reconciliation*
 *Maintained by: Hasham | MeetingMind AI*

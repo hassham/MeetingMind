@@ -8,8 +8,9 @@ next," see `BACKLOG.md` instead — this file should rarely need edits mid-sprin
 
 MeetingMind AI converts uploaded meeting audio into a transcript and
 structured, AI-generated meeting minutes (decisions, action items, risks,
-next steps). MVP runs as a local application; architecture is designed to
-migrate to cloud (AWS/Azure) later without touching business logic.
+next steps). The completed MVP and the active Phase 2 hardening cycle run as a
+trusted local application. Cloud deployment is a future delivery cycle, not
+part of Phase 2.
 
 Full specs live in `/docs`:
 - `docs/PRD.md` — product requirements, scope, user stories
@@ -26,8 +27,10 @@ architecture, or requirements — don't guess when it's already specified.
 - **Database:** PostgreSQL (Docker, see `docker-compose.yml`)
 - **Background processing:** Hangfire for queueing, background jobs, retries, and workflow execution
 - **Audio processing:** FFmpeg (wrapped behind `IAudioProcessingService`, never called directly from controllers)
-- **AI services:** OpenAI Whisper API (transcription), OpenAI GPT (minutes generation)
-- **Storage:** local file storage in v1 (`Storage/Audio`, `Storage/Transcript`, `Storage/Minutes`), behind `IFileStorageService` for future S3/Blob swap
+- **AI services:** local Whisper.net (transcription), OpenAI GPT (minutes generation)
+- **Storage:** local file storage through Phase 2 (`Storage/Audio`,
+  `Storage/Transcript`, `Storage/Minutes`), behind `IFileStorageService` for a
+  possible future S3/Blob swap
 
 ## Solution structure (actual — keep this in sync with reality)
 
@@ -47,8 +50,7 @@ src/
                                itself; it only enqueues and reads status from the DB.
 ```
 
-The `Worker` project is the key addition versus the original SAD diagram —
-it's where the Hangfire job execution lives. Api stays completely unaware of
+The `Worker` project is where Hangfire job execution lives. Api stays completely unaware of
 *how* processing happens; it only creates the `MeetingJob` record, enqueues,
 and returns immediately.
 
@@ -71,14 +73,15 @@ and returns immediately.
   `IMeetingMinutesService`, `IBackgroundJobService`). This is what makes the
   cloud migration path (see SAD §14) possible later — don't bypass it for
   convenience.
-- **No authentication in v1.** All endpoints, including retry, are
-  unauthenticated by design (see PRD §8, FSD §3, SAD §12). Don't add auth
-  scaffolding unless explicitly asked — it's scoped for v2.
+- **No authentication in Phase 2.** All endpoints, including retry and the
+  Hangfire dashboard, remain unauthenticated because Phase 2 is restricted to a
+  trusted local deployment (see PRD §6, FSD §§1 and 7, SAD §12). Do not add auth
+  scaffolding unless a later delivery cycle explicitly changes that boundary.
 
 ## Background job / queue decision
 
 Decision recorded 2026-07-06: use **Hangfire** for queueing, background job
-execution, retries, and workflow orchestration in the local MVP.
+execution, retries, and workflow orchestration in the local application.
 
 Hangfire is the implementation behind `IBackgroundJobService`, running inside
 `MeetingMind.Worker`. Controllers must still depend on application
@@ -86,10 +89,16 @@ abstractions and must not call Hangfire, FFmpeg, Whisper, GPT/OpenAI, or
 persistence directly for long-running work.
 
 The processing chain is decoupled as:
-`upload -> create MeetingJob -> enqueue Hangfire job -> FFmpeg -> Whisper
-transcription -> OpenAI GPT meeting-minutes generation -> save results`.
+`upload -> create MeetingJob -> enqueue Hangfire job -> FFmpeg -> local
+Whisper.net transcription -> OpenAI GPT meeting-minutes generation -> save
+results`.
 
-## Data model (summary — see SAD §8 / FSD §8 for full field lists)
+Phase 1 supports manual retry. Phase 2 adds configurable automatic retry for
+classified transient failures while retaining manual retry for failed or
+cancelled jobs. Until P2-05 is complete, do not describe automatic retry as
+implemented behavior.
+
+## Data model (summary — see SAD §7 / FSD §5 for full field lists)
 
 - `MeetingJob` — Id, file paths, Status, Stage, Progress, ErrorMessage, timestamps
 - `MeetingTranscript` — Id, MeetingJobId, TranscriptText, TranscriptFilePath
@@ -109,12 +118,10 @@ Job stage enum: `Uploaded | Validating | Transcoding | Transcribing | Generating
 
 ## Build & test
 
-> Fill in once these are finalized in the repo — Codex should run these
-> after every change and report failures before considering work done.
-
-- Build: `dotnet build`
-- Test: `dotnet test`
-- Frontend: `npm run build` / `npm test` (in `/frontend`)
+- Build: `dotnet build MeetingMind.sln`
+- Test: `dotnet test MeetingMind.sln`
+- Frontend: `npm run lint` / `npm run build` / `npm test` (in
+  `/frontend/meetingmind-ui`; the test script is a Phase 2 deliverable)
 - Local infra: PostgreSQL via `docker compose up`
 
 ## Prompting approach for this project
