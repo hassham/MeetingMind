@@ -61,6 +61,9 @@ public sealed class MeetingMindApiFactory : WebApplicationFactory<Program>, IAsy
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:DefaultConnection", _connectionString);
+        builder.UseSetting(
+            "Storage:RootPath",
+            Path.Combine(Path.GetTempPath(), "MeetingMind.Api.IntegrationTests"));
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IBackgroundJobService>();

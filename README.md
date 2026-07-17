@@ -158,14 +158,9 @@ Install the following before running MeetingMind:
 - [FFmpeg](https://ffmpeg.org/download.html)
 - An OpenAI API key for meeting-minutes generation
 
-The default Worker configuration expects FFmpeg at:
-
-```text
-C:\ffmpeg\ffmpeg.exe
-```
-
-Change `AudioProcessing:FfmpegBinaryFolder` in the Worker configuration or set
-the corresponding environment variable if FFmpeg is installed elsewhere.
+The Worker requires the absolute path to either the FFmpeg executable or the
+folder containing it. The path is configured outside committed files as shown
+below.
 
 ## Local setup
 
@@ -194,6 +189,36 @@ These credentials are for local development only.
 
 ### 2. Restore tools, apply migrations, build, and test
 
+Create the shared storage folder and configure its absolute path once for the
+current Windows user. API and Worker then inherit exactly the same value:
+
+```powershell
+$storageRoot = (New-Item -ItemType Directory -Force -Path .\Storage).FullName
+[Environment]::SetEnvironmentVariable("Storage__RootPath", $storageRoot, "User")
+$env:Storage__RootPath = $storageRoot
+```
+
+Configure FFmpeg for the Worker with an absolute executable or folder path:
+
+```powershell
+$ffmpegPath = "C:\path\to\ffmpeg.exe"
+[Environment]::SetEnvironmentVariable(
+  "AudioProcessing__FfmpegBinaryFolder",
+  $ffmpegPath,
+  "User")
+```
+
+Store the OpenAI key in the Worker's .NET user-secret store:
+
+```powershell
+dotnet user-secrets set "OpenAI:ApiKey" "your-openai-api-key" `
+  --project src\MeetingMind.Worker
+```
+
+Never place the key in `appsettings*.json` or any other committed file.
+
+Now restore, migrate, build, and test:
+
 ```powershell
 dotnet tool restore
 dotnet restore
@@ -206,7 +231,7 @@ dotnet test MeetingMind.sln
 
 ### 3. Start the API
 
-Open a new PowerShell window:
+Open a new PowerShell window after setting the user environment variables:
 
 ```powershell
 cd path\to\MeetingMind
@@ -217,11 +242,10 @@ The API listens on `http://localhost:5059`.
 
 ### 4. Start the Worker
 
-Open another PowerShell window and set the OpenAI API key for that process:
+Open another PowerShell window:
 
 ```powershell
 cd path\to\MeetingMind
-$env:OPENAI_API_KEY = "your-openai-api-key"
 dotnet run --project src\MeetingMind.Worker
 ```
 
@@ -284,21 +308,40 @@ Common settings include:
 | Setting | Environment variable | Default |
 | --- | --- | --- |
 | PostgreSQL connection | `ConnectionStrings__DefaultConnection` | Local Docker PostgreSQL |
-| Storage root | `Storage__RootPath` | Path configured in `appsettings.json` |
+| Storage root | `Storage__RootPath` | Required absolute path shared by API and Worker |
 | Maximum upload size | `Storage__MaxUploadSizeMb` | `100` MB |
-| FFmpeg location | `AudioProcessing__FfmpegBinaryFolder` | `C:\ffmpeg\ffmpeg.exe` |
+| FFmpeg location | `AudioProcessing__FfmpegBinaryFolder` | Required absolute executable or folder path |
 | Whisper model size | `Transcription__ModelSize` | `small` |
 | Whisper model directory | `Transcription__ModelDirectory` | `Models/Whisper` |
 | Automatic model download | `Transcription__AutoDownloadModel` | `true` |
 | Transcription language | `Transcription__Language` | `auto` |
-| OpenAI API key | `OPENAI_API_KEY` or `OpenAI__ApiKey` | Not configured |
+| OpenAI API key | `OpenAI__ApiKey` | Required by Worker; no committed default |
 | OpenAI model | `OpenAI__Model` | `gpt-4.1` |
 | Transcript character guard | `OpenAI__MaxTranscriptCharactersForMinutes` | `120000` |
 
-The API and Worker must use the same `Storage__RootPath`. The committed local
-configuration points to `C:\work\Meetingminutes\MeetingMind\Storage`; update
-both application settings or set the environment variable in both processes if
-the repository is located elsewhere.
+The API and Worker must use the same `Storage__RootPath`. Configure it once as
+a user environment variable so both processes inherit the identical absolute
+path. Confirm the configured value in any new PowerShell window with:
+
+```powershell
+[Environment]::GetEnvironmentVariable("Storage__RootPath", "User")
+```
+
+The local Docker connection string is a committed development-only default.
+Override it with `ConnectionStrings__DefaultConnection` when needed. If using
+.NET user secrets for that override, set the same value for both projects:
+
+```powershell
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<connection-string>" `
+  --project src\MeetingMind.Api
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<connection-string>" `
+  --project src\MeetingMind.Worker
+```
+
+API startup validates the database, storage, and upload settings. Worker
+startup validates those settings plus FFmpeg, Whisper, and OpenAI settings.
+Missing or invalid required configuration stops startup and names the setting
+that must be corrected.
 
 Never commit real API keys or other secrets. Use environment variables or .NET
 user secrets on the local machine.
@@ -363,10 +406,10 @@ database as the API.
 
 ### FFmpeg processing fails
 
-Confirm `ffmpeg.exe` exists at the configured path, or set:
+Confirm `ffmpeg.exe` exists at the configured absolute path, then set:
 
 ```powershell
-$env:AudioProcessing__FfmpegBinaryFolder = "C:\path\to\ffmpeg"
+$env:AudioProcessing__FfmpegBinaryFolder = "C:\path\to\ffmpeg.exe"
 ```
 
 ### Whisper model download fails
@@ -376,8 +419,8 @@ Confirm the Worker has internet access for its first model download, or set
 
 ### Minutes generation fails
 
-Confirm `OPENAI_API_KEY` is set in the same PowerShell window that starts the
-Worker.
+Confirm `OpenAI:ApiKey` exists in the Worker user-secret store, or set
+`OpenAI__ApiKey` in the same PowerShell window that starts the Worker.
 
 ### Database health fails
 

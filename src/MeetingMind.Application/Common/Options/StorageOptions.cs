@@ -2,7 +2,7 @@ namespace MeetingMind.Application.Common.Options;
 
 public class StorageOptions
 {
-    public string RootPath { get; set; } = "Storage";
+    public string RootPath { get; set; } = string.Empty;
 
     public int MaxUploadSizeMb { get; set; } = 100;
 

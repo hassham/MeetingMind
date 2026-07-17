@@ -3,7 +3,6 @@ using MeetingMind.Application.Meetings;
 using MeetingMind.Domain.Entities;
 using MeetingMind.Domain.Enums;
 using MeetingMind.Worker.Jobs;
-using MeetingMind.Worker.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace MeetingMind.Worker.Tests;
@@ -116,7 +115,6 @@ public sealed class MeetingProcessingJobTests
                 Audio,
                 Storage,
                 Repository,
-                new ProcessingOptions(),
                 Transcription,
                 Minutes);
         }

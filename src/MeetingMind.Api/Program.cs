@@ -5,6 +5,7 @@ using MeetingMind.Application.Common.Interfaces;
 using MeetingMind.Application.Common.Options;
 using MeetingMind.Application.Meetings;
 using MeetingMind.Infrastructure.BackgroundJobs;
+using MeetingMind.Infrastructure.Configuration;
 using MeetingMind.Infrastructure.Persistence;
 using MeetingMind.Infrastructure.Storage;
 using Microsoft.AspNetCore.Http.Features;
@@ -18,10 +19,10 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required.");
+var connectionString = MeetingMindConfiguration.GetConnectionString(builder.Configuration);
 
-var storageOptions = builder.Configuration.GetSection("Storage").Get<StorageOptions>() ?? new StorageOptions();
+var storageOptions = MeetingMindConfiguration.ValidateStorageOptions(
+    builder.Configuration.GetSection("Storage").Get<StorageOptions>() ?? new StorageOptions());
 builder.Services.AddSingleton(storageOptions);
 
 builder.Services.Configure<FormOptions>(options =>

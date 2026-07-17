@@ -91,8 +91,8 @@ Phase 2 is complete only when:
 
 ## Current focus
 
-P2-03 is next. It requires task-specific discovery before configuration changes
-begin.
+P2-04 is next. It requires task-specific discovery before duration semantics
+and contract changes begin.
 
 ## Ordered Phase 2 work packages
 
@@ -126,18 +126,20 @@ begin.
 
 ### P2-03 - Make configuration portable and fail fast
 
-- [ ] Remove committed machine-specific storage and FFmpeg paths while keeping
+- [x] Remove committed machine-specific storage and FFmpeg paths while keeping
       local defaults easy to use.
-      Status: TODO.
-- [ ] Add startup validation for storage, upload, audio, transcription, OpenAI,
+      Status: DONE. Completed: 2026-07-17.
+- [x] Add startup validation for storage, upload, audio, transcription, OpenAI,
       database, processing, and retry settings where each setting is required.
-      Status: TODO.
-- [ ] Ensure the API and Worker resolve the same storage root and document
+      Status: DONE. Completed: 2026-07-17.
+      Notes: Obsolete stub-processing configuration was removed. Automatic
+      retry configuration remains intentionally pending until P2-05.
+- [x] Ensure the API and Worker resolve the same storage root and document
       environment-variable and .NET user-secret setup.
-      Status: TODO.
-- [ ] Remove or explicitly isolate the API stub-processing delay from normal
+      Status: DONE. Completed: 2026-07-17.
+- [x] Remove or explicitly isolate the API stub-processing delay from normal
       operation.
-      Status: TODO.
+      Status: DONE. Completed: 2026-07-17.
 
 ### P2-04 - Complete processing-duration tracking
 

@@ -20,7 +20,7 @@ public class OpenAiMeetingMinutesService : IMeetingMinutesService
         if (string.IsNullOrWhiteSpace(_openAiOptions.ApiKey))
         {
             throw new InvalidOperationException(
-                "OpenAI API key is required. Configure OpenAI:ApiKey or OPENAI_API_KEY.");
+                "OpenAI API key is required. Configure OpenAI:ApiKey.");
         }
 
         if (string.IsNullOrWhiteSpace(_openAiOptions.Model))

@@ -2,7 +2,6 @@ using MeetingMind.Application.Common.Interfaces;
 using MeetingMind.Application.Meetings;
 using MeetingMind.Domain.Entities;
 using MeetingMind.Domain.Enums;
-using MeetingMind.Worker.Options;
 using System.Text.Json;
 
 namespace MeetingMind.Worker.Jobs;
@@ -16,7 +15,6 @@ public class MeetingProcessingJob : IMeetingProcessingJob
     private readonly IAudioProcessingService _audioProcessingService;
     private readonly IFileStorageService _fileStorageService;
     private readonly IMeetingJobRepository _meetingJobRepository;
-    private readonly ProcessingOptions _processingOptions;
     private readonly ITranscriptionService _transcriptionService;
     private readonly IMeetingMinutesService _meetingMinutesService;
 
@@ -25,7 +23,6 @@ public class MeetingProcessingJob : IMeetingProcessingJob
         IAudioProcessingService audioProcessingService,
         IFileStorageService fileStorageService,
         IMeetingJobRepository meetingJobRepository,
-        ProcessingOptions processingOptions,
         ITranscriptionService transcriptionService,
         IMeetingMinutesService meetingMinutesService)
     {
@@ -33,7 +30,6 @@ public class MeetingProcessingJob : IMeetingProcessingJob
         _audioProcessingService = audioProcessingService;
         _fileStorageService = fileStorageService;
         _meetingJobRepository = meetingJobRepository;
-        _processingOptions = processingOptions;
         _transcriptionService = transcriptionService;
         _meetingMinutesService = meetingMinutesService;
     }
@@ -62,11 +58,6 @@ public class MeetingProcessingJob : IMeetingProcessingJob
                 CancellationToken.None);
             currentStage = MeetingJobStage.Validating;
             currentProgress = 0;
-
-            if (_processingOptions.StubProcessingDelaySeconds > 0)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(_processingOptions.StubProcessingDelaySeconds));
-            }
 
             await _meetingJobRepository.UpdateStatusAsync(
                 jobId,

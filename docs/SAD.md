@@ -339,12 +339,19 @@ Configuration areas:
 - `AudioProcessing`
 - `Transcription`
 - `OpenAI`
-- `Processing`
 - Phase 2 retry and retention settings
 
-The API and Worker must resolve the same database and storage root. Only the
-Worker requires FFmpeg, Whisper, and OpenAI generation configuration. P2-03
-removes committed absolute paths and adds fail-fast validation.
+The API and Worker inherit one required absolute `Storage__RootPath` environment
+variable, ensuring both resolve the same physical artifact root. The committed
+PostgreSQL connection string is a Docker-only local default and may be
+overridden through standard .NET configuration. Only the Worker requires an
+explicit existing FFmpeg path, Whisper configuration, and `OpenAI:ApiKey`.
+
+Startup performs shared validation before either host is built. Missing or
+invalid settings stop startup with a message naming the configuration key. The
+stub-processing delay was removed because the Worker executes the real pipeline.
+Retry policy configuration remains owned by P2-05 and retention configuration
+by P2-07.
 
 ## 11. Observability and operations
 
