@@ -48,6 +48,11 @@ src/
                                runs the meeting-processing workflow once a job is
                                dequeued via Hangfire. Api never processes jobs
                                itself; it only enqueues and reads status from the DB.
+tests/
+  MeetingMind.Unit.Tests/
+  MeetingMind.Api.IntegrationTests/
+  MeetingMind.Infrastructure.IntegrationTests/
+  MeetingMind.Worker.Tests/
 ```
 
 The `Worker` project is where Hangfire job execution lives. Api stays completely unaware of
@@ -121,7 +126,7 @@ Job stage enum: `Uploaded | Validating | Transcoding | Transcribing | Generating
 - Build: `dotnet build MeetingMind.sln`
 - Test: `dotnet test MeetingMind.sln`
 - Frontend: `npm run lint` / `npm run build` / `npm test` (in
-  `/frontend/meetingmind-ui`; the test script is a Phase 2 deliverable)
+  `/frontend/meetingmind-ui`)
 - Local infra: PostgreSQL via `docker compose up`
 
 ## Prompting approach for this project

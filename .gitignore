@@ -11,6 +11,7 @@
 ## Node / React
 **/node_modules/
 frontend/meetingmind-ui/dist/
+frontend/meetingmind-ui/coverage/
 frontend/meetingmind-ui/.env
 
 ## Local storage / secrets

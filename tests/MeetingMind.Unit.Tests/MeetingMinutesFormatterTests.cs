@@ -1,6 +1,6 @@
 using MeetingMind.Application.Meetings;
 
-namespace MeetingMind.Domain.Tests;
+namespace MeetingMind.Unit.Tests;
 
 public class MeetingMinutesFormatterTests
 {

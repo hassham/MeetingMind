@@ -2,7 +2,7 @@ using MeetingMind.Application.Common.Interfaces;
 using MeetingMind.Domain.Entities;
 using MeetingMind.Domain.Enums;
 
-namespace MeetingMind.Domain.Tests;
+namespace MeetingMind.Unit.Tests;
 
 internal sealed class RetryStubMeetingJobRepository : IMeetingJobRepository
 {

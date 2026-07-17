@@ -20,3 +20,6 @@ new product features are outside Phase 2.
 - [`QUESTIONS_phase2_planning.md`](QUESTIONS_phase2_planning.md) - delivery-cycle
   theme, breadth, retries, long meetings, deployment boundary, and completion
   gate.
+- [`QUESTIONS_p2_02_automated_verification.md`](QUESTIONS_p2_02_automated_verification.md)
+  - backend test separation, disposable PostgreSQL, API test hosting, Worker
+  doubles, frontend tooling, Docker behavior, and coverage policy.

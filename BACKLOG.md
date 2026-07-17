@@ -7,7 +7,7 @@ Phase 2 decisions are preserved under
 
 Status legend: `TODO` | `IN PROGRESS` | `BLOCKED` | `PARTIAL` | `DONE`
 
-Last verified against code: 2026-07-15.
+Last verified against code: 2026-07-17.
 
 ## Current delivery cycle: Phase 2
 
@@ -91,8 +91,8 @@ Phase 2 is complete only when:
 
 ## Current focus
 
-P2-02 is next. It requires task-specific discovery and approval of any proposed
-test packages before implementation.
+P2-03 is next. It requires task-specific discovery before configuration changes
+begin.
 
 ## Ordered Phase 2 work packages
 
@@ -113,16 +113,16 @@ test packages before implementation.
 
 ### P2-02 - Establish the automated verification foundation
 
-- [ ] Add focused test projects and fixtures for API contracts, PostgreSQL
+- [x] Add focused test projects and fixtures for API contracts, PostgreSQL
       persistence, and the Worker processing workflow.
-      Status: TODO.
-- [ ] Add frontend test tooling and tests for the critical upload, polling,
+      Status: DONE. Completed: 2026-07-17.
+- [x] Add frontend test tooling and tests for the critical upload, polling,
       result, history, and retry states.
-      Status: TODO.
-- [ ] Keep external AI, FFmpeg, and filesystem dependencies behind test doubles
+      Status: DONE. Completed: 2026-07-17.
+- [x] Keep external AI, FFmpeg, and filesystem dependencies behind test doubles
       in automated tests; reserve real integrations for documented end-to-end
       acceptance testing.
-      Status: TODO.
+      Status: DONE. Completed: 2026-07-17.
 
 ### P2-03 - Make configuration portable and fail fast
 

@@ -63,7 +63,10 @@ src/
   MeetingMind.Worker/          Hangfire server, processing handler, Worker composition root
   MeetingMind.Shared/          Cross-entry-point contracts when genuinely shared
 tests/
-  MeetingMind.Domain.Tests/    Existing Domain/Application-focused unit tests
+  MeetingMind.Unit.Tests/      Domain/Application-focused unit tests
+  MeetingMind.Worker.Tests/    Deterministic processing-orchestration tests
+  MeetingMind.Api.IntegrationTests/             HTTP/API tests with disposable PostgreSQL
+  MeetingMind.Infrastructure.IntegrationTests/  EF Core repository tests with disposable PostgreSQL
 ```
 
 Allowed project dependencies:
