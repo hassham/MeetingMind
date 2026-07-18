@@ -1,5 +1,7 @@
 using MeetingMind.Application.Common.Options;
 using MeetingMind.Infrastructure.Configuration;
+using MeetingMind.Application.Common.Exceptions;
+using MeetingMind.Worker;
 using Microsoft.Extensions.Configuration;
 
 namespace MeetingMind.Worker.Tests;
@@ -39,6 +41,8 @@ public sealed class ConfigurationValidationTests : IDisposable
         {
             ApiKey = "test-key"
         });
+        var automaticRetry = MeetingMindConfiguration.ValidateAutomaticRetryOptions(
+            new AutomaticRetryOptions { DelaysInSeconds = [10, 60] });
 
         Assert.Equal(Path.GetFullPath(_temporaryRoot), firstStorage.RootPath);
         Assert.Equal(firstStorage.RootPath, secondStorage.RootPath);
@@ -46,6 +50,8 @@ public sealed class ConfigurationValidationTests : IDisposable
         Assert.True(transcription.AutoDownloadModel);
         Assert.Equal("small", transcription.ModelSize);
         Assert.Equal("test-key", openAi.ApiKey);
+        Assert.Equal(2, automaticRetry.RetryLimit);
+        Assert.Equal([10, 60], automaticRetry.DelaysInSeconds);
         Assert.Contains("Database=meetingmind", connectionString);
     }
 
@@ -113,6 +119,27 @@ public sealed class ConfigurationValidationTests : IDisposable
             MeetingMindConfiguration.ValidateOpenAiOptions(new OpenAiOptions()));
 
         Assert.Contains("OpenAI:ApiKey", exception.Message);
+    }
+
+    [Fact]
+    public void AutomaticRetryRequiresPositiveConfiguredDelays()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            MeetingMindConfiguration.ValidateAutomaticRetryOptions(
+                new AutomaticRetryOptions { DelaysInSeconds = [10, 0] }));
+
+        Assert.Contains("AutomaticRetry:DelaysInSeconds:1", exception.Message);
+    }
+
+    [Fact]
+    public void HangfireFilterUsesConfiguredAttemptsDelaysAndPermanentExclusion()
+    {
+        var filter = MeetingAutomaticRetryConfiguration.CreateFilter(
+            new AutomaticRetryOptions { DelaysInSeconds = [10, 60] });
+
+        Assert.Equal(2, filter.Attempts);
+        Assert.Equal([10, 60], filter.DelaysInSeconds);
+        Assert.Contains(typeof(PermanentMeetingProcessingException), filter.ExceptOn);
     }
 
     public void Dispose()

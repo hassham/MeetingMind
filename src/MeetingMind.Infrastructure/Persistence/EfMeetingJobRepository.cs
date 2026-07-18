@@ -166,8 +166,83 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         meetingJob.Progress = 0;
         meetingJob.ErrorMessage = null;
         meetingJob.HangfireJobId = null;
-        meetingJob.StartedAt = null;
-        meetingJob.CompletedAt = null;
+        meetingJob.AutomaticRetryCount = 0;
+        meetingJob.AutomaticRetryLimit = 0;
+        meetingJob.NextRetryAt = null;
+        meetingJob.UpdatedAt = now;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task BeginProcessingAsync(
+        Guid meetingJobId,
+        int automaticRetryLimit,
+        CancellationToken cancellationToken)
+    {
+        var meetingJob = await GetMeetingJobAsync(meetingJobId, cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+
+        if (meetingJob.Status == MeetingJobStatus.Queued && meetingJob.AutomaticRetryCount == 0)
+        {
+            meetingJob.StartedAt = now;
+            meetingJob.CompletedAt = null;
+        }
+
+        meetingJob.Status = MeetingJobStatus.Processing;
+        meetingJob.Stage = MeetingJobStage.Validating;
+        meetingJob.Progress = 0;
+        meetingJob.ErrorMessage = null;
+        meetingJob.AutomaticRetryLimit = automaticRetryLimit;
+        meetingJob.NextRetryAt = null;
+        meetingJob.UpdatedAt = now;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ScheduleAutomaticRetryAsync(
+        Guid meetingJobId,
+        MeetingJobStage stage,
+        int progress,
+        string errorMessage,
+        int automaticRetryCount,
+        int automaticRetryLimit,
+        DateTimeOffset nextRetryAt,
+        CancellationToken cancellationToken)
+    {
+        var meetingJob = await GetMeetingJobAsync(meetingJobId, cancellationToken);
+
+        meetingJob.Status = MeetingJobStatus.Queued;
+        meetingJob.Stage = stage;
+        meetingJob.Progress = progress;
+        meetingJob.ErrorMessage = errorMessage;
+        meetingJob.AutomaticRetryCount = automaticRetryCount;
+        meetingJob.AutomaticRetryLimit = automaticRetryLimit;
+        meetingJob.NextRetryAt = nextRetryAt;
+        meetingJob.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RecordFinalFailureAsync(
+        Guid meetingJobId,
+        MeetingJobStage stage,
+        int progress,
+        string errorMessage,
+        int automaticRetryCount,
+        int automaticRetryLimit,
+        CancellationToken cancellationToken)
+    {
+        var meetingJob = await GetMeetingJobAsync(meetingJobId, cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+
+        meetingJob.Status = MeetingJobStatus.Failed;
+        meetingJob.Stage = stage;
+        meetingJob.Progress = progress;
+        meetingJob.ErrorMessage = errorMessage;
+        meetingJob.AutomaticRetryCount = automaticRetryCount;
+        meetingJob.AutomaticRetryLimit = automaticRetryLimit;
+        meetingJob.NextRetryAt = null;
+        meetingJob.CompletedAt = now;
         meetingJob.UpdatedAt = now;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -183,16 +258,21 @@ public class EfMeetingJobRepository : IMeetingJobRepository
     {
         var meetingJob = await GetMeetingJobAsync(meetingJobId, cancellationToken);
         var now = DateTimeOffset.UtcNow;
+        var previousStatus = meetingJob.Status;
 
         meetingJob.Status = status;
         meetingJob.Stage = stage;
         meetingJob.Progress = progress;
         meetingJob.ErrorMessage = errorMessage;
+        meetingJob.NextRetryAt = null;
         meetingJob.UpdatedAt = now;
 
-        if (status == MeetingJobStatus.Processing && meetingJob.StartedAt is null)
+        if (status == MeetingJobStatus.Processing &&
+            previousStatus == MeetingJobStatus.Queued &&
+            meetingJob.AutomaticRetryCount == 0)
         {
             meetingJob.StartedAt = now;
+            meetingJob.CompletedAt = null;
         }
 
         if (status is MeetingJobStatus.Completed or MeetingJobStatus.Failed or MeetingJobStatus.Cancelled)

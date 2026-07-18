@@ -56,6 +56,11 @@ public sealed class TestFileStorageService : IFileStorageService
         return Task.FromResult(path);
     }
 
+    public Task<bool> ExistsAsync(string filePath, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(_files.ContainsKey(filePath));
+    }
+
     public Task<Stream> ReadAsync(string filePath, CancellationToken cancellationToken)
     {
         if (!_files.TryGetValue(filePath, out var content))

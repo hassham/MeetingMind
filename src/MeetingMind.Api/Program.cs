@@ -49,6 +49,7 @@ builder.Services.AddHangfire(configuration =>
 });
 
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IBackgroundJobService, HangfireBackgroundJobService>();
 builder.Services.AddScoped<IMeetingJobRepository, EfMeetingJobRepository>();
 builder.Services.AddScoped<IUploadMeetingService, UploadMeetingService>();

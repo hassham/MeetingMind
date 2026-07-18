@@ -4,6 +4,7 @@ using MeetingMind.Application.Common.Interfaces;
 using MeetingMind.Application.Common.Options;
 using MeetingMind.Infrastructure.Audio;
 using MeetingMind.Infrastructure.Configuration;
+using MeetingMind.Infrastructure.Failures;
 using MeetingMind.Infrastructure.OpenAI;
 using MeetingMind.Infrastructure.Persistence;
 using MeetingMind.Infrastructure.Storage;
@@ -35,6 +36,14 @@ var openAiOptions = MeetingMindConfiguration.ValidateOpenAiOptions(
     builder.Configuration.GetSection("OpenAI").Get<OpenAiOptions>() ?? new OpenAiOptions());
 builder.Services.AddSingleton(openAiOptions);
 
+var automaticRetryOptions = MeetingMindConfiguration.ValidateAutomaticRetryOptions(
+    builder.Configuration.GetSection("AutomaticRetry").Get<AutomaticRetryOptions>()
+        ?? new AutomaticRetryOptions());
+builder.Services.AddSingleton(automaticRetryOptions);
+
+GlobalJobFilters.Filters.Remove<AutomaticRetryAttribute>();
+GlobalJobFilters.Filters.Add(MeetingAutomaticRetryConfiguration.CreateFilter(automaticRetryOptions));
+
 builder.Services.AddDbContext<MeetingMindDbContext>(options =>
 {
     options.UseNpgsql(connectionString);
@@ -54,6 +63,8 @@ builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddScoped<IAudioProcessingService, FfmpegAudioProcessingService>();
 builder.Services.AddScoped<ITranscriptionService, WhisperNetTranscriptionService>();
 builder.Services.AddScoped<IMeetingMinutesService, OpenAiMeetingMinutesService>();
+builder.Services.AddSingleton<IMeetingFailureClassifier, MeetingFailureClassifier>();
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IMeetingProcessingJob, MeetingProcessingJob>();
 
 var host = builder.Build();

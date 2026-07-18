@@ -11,6 +11,7 @@ public class MeetingStatusServiceTests
     public async Task GetStatusAsyncMapsMeetingJobToStatusResult()
     {
         var jobId = Guid.NewGuid();
+        var now = new DateTimeOffset(2026, 7, 18, 10, 0, 0, TimeSpan.Zero);
         var repository = new StubMeetingJobRepository
         {
             MeetingJob = new MeetingJob
@@ -19,10 +20,17 @@ public class MeetingStatusServiceTests
                 Status = MeetingJobStatus.Failed,
                 Stage = MeetingJobStage.Failed,
                 Progress = 25,
-                ErrorMessage = "Processing not yet implemented"
+                ErrorMessage = "Processing not yet implemented",
+                AutomaticRetryCount = 1,
+                AutomaticRetryLimit = 2,
+                NextRetryAt = now.AddSeconds(30),
+                CreatedAt = now.AddSeconds(-100),
+                StartedAt = now.AddSeconds(-60),
+                CompletedAt = now.AddSeconds(-10),
+                UpdatedAt = now.AddSeconds(-10)
             }
         };
-        var service = new MeetingStatusService(repository);
+        var service = new MeetingStatusService(repository, new FixedTimeProvider(now));
 
         var result = await service.GetStatusAsync(jobId, CancellationToken.None);
 
@@ -32,12 +40,19 @@ public class MeetingStatusServiceTests
         Assert.Equal("Failed", result.Stage);
         Assert.Equal(25, result.Progress);
         Assert.Equal("Processing not yet implemented", result.ErrorMessage);
+        Assert.Equal(1, result.AutomaticRetryCount);
+        Assert.Equal(2, result.AutomaticRetryLimit);
+        Assert.Equal(now.AddSeconds(30), result.NextRetryAt);
+        Assert.Equal(50, result.ProcessingDurationSeconds);
+        Assert.Equal(90, result.TotalDurationSeconds);
     }
 
     [Fact]
     public async Task GetStatusAsyncReturnsNullForMissingMeetingJob()
     {
-        var service = new MeetingStatusService(new StubMeetingJobRepository());
+        var service = new MeetingStatusService(
+            new StubMeetingJobRepository(),
+            new FixedTimeProvider(DateTimeOffset.UtcNow));
 
         var result = await service.GetStatusAsync(Guid.NewGuid(), CancellationToken.None);
 
@@ -116,6 +131,36 @@ public class MeetingStatusServiceTests
         }
 
         public Task ResetForRetryAsync(Guid meetingJobId, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task BeginProcessingAsync(Guid meetingJobId, int automaticRetryLimit, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task ScheduleAutomaticRetryAsync(
+            Guid meetingJobId,
+            MeetingJobStage stage,
+            int progress,
+            string errorMessage,
+            int automaticRetryCount,
+            int automaticRetryLimit,
+            DateTimeOffset nextRetryAt,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task RecordFinalFailureAsync(
+            Guid meetingJobId,
+            MeetingJobStage stage,
+            int progress,
+            string errorMessage,
+            int automaticRetryCount,
+            int automaticRetryLimit,
+            CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
         }

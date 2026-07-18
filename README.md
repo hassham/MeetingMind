@@ -18,6 +18,7 @@ The implemented workflow supports:
 - Validating file extension, MIME type, filename, and configurable file size.
 - Returning a job ID without waiting for audio or AI processing.
 - Tracking job stage, status, progress, and errors.
+- Tracking live processing and total elapsed duration.
 - Converting audio to Whisper-compatible WAV with FFmpeg.
 - Transcribing audio locally with Whisper.net.
 - Generating structured meeting minutes with OpenAI GPT.
@@ -290,12 +291,51 @@ npm.cmd run dev
 | `GET` | `/health` | API health check |
 | `GET` | `/health/db` | PostgreSQL health check |
 | `POST` | `/api/meetings/upload` | Upload audio and enqueue a job |
-| `GET` | `/api/meetings/{jobId}/status` | Read job status and progress |
-| `GET` | `/api/meetings/history?skip=0&take=50` | Read processing history |
+| `GET` | `/api/meetings/{jobId}/status` | Read job status, progress, and duration |
+| `GET` | `/api/meetings/history?skip=0&take=50` | Read processing history with duration |
 | `GET` | `/api/meetings/{jobId}/result` | Read structured minutes |
 | `GET` | `/api/meetings/{jobId}/transcript/download` | Download transcript text |
 | `GET` | `/api/meetings/{jobId}/minutes/download` | Download Markdown minutes |
 | `POST` | `/api/meetings/{jobId}/retry` | Retry a failed or cancelled job |
+
+## Duration semantics
+
+Status and history return two non-negative whole-second fields:
+
+- `processingDurationSeconds` measures Worker execution for the current or
+  most recently completed attempt.
+- `totalDurationSeconds` measures elapsed time since the original upload,
+  including queue time and manual retries.
+
+An initial queued job has zero processing duration while total duration grows.
+Both values grow while processing. Terminal values stop at completion, with
+`UpdatedAt` used only when older terminal data lacks `CompletedAt`.
+
+After manual retry, the queued job keeps showing the previous attempt's final
+processing duration. Processing resets when the Worker starts the new attempt;
+total duration continues from the original upload. The frontend displays both
+values as `0s`, `2m 05s`, or `1h 02m 03s` and ticks the selected active job once
+per second between API polls.
+
+During an automatic-retry delay, processing duration remains live from the
+original automatic-recovery run's `StartedAt`. A later manual retry starts a new
+processing-duration attempt.
+
+## Automatic retry behavior
+
+The Worker uses Hangfire for two automatic retries after the initial execution,
+with default delays of 10 and 60 seconds. Transient storage, network, provider,
+and database failures are retried. Known invalid input, missing dependencies,
+unsafe paths, unsupported media, invalid provider responses, and non-transient
+database errors fail immediately. Unclassified failures use the same bounded
+automatic-retry policy.
+
+While waiting, a job is `Queued` at its last stage and progress and exposes
+`automaticRetryCount`, `automaticRetryLimit`, and `nextRetryAt` through status
+and history. Retries reuse a valid transcript checkpoint first, then valid
+processed audio; missing checkpoints fall back to the nearest safe earlier
+stage. Exhausted and permanent failures remain eligible for manual retry, which
+receives a fresh automatic-retry budget.
 
 ## Configuration
 
@@ -318,6 +358,7 @@ Common settings include:
 | OpenAI API key | `OpenAI__ApiKey` | Required by Worker; no committed default |
 | OpenAI model | `OpenAI__Model` | `gpt-4.1` |
 | Transcript character guard | `OpenAI__MaxTranscriptCharactersForMinutes` | `120000` |
+| Automatic retry delays | `AutomaticRetry__DelaysInSeconds__0`, `AutomaticRetry__DelaysInSeconds__1` | `10`, `60` seconds |
 
 The API and Worker must use the same `Storage__RootPath`. Configure it once as
 a user environment variable so both processes inherit the identical absolute

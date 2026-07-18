@@ -80,7 +80,12 @@ public class MeetingsController : ControllerBase
             status = result.Status,
             stage = result.Stage,
             progress = result.Progress,
-            errorMessage = result.ErrorMessage
+            errorMessage = result.ErrorMessage,
+            automaticRetryCount = result.AutomaticRetryCount,
+            automaticRetryLimit = result.AutomaticRetryLimit,
+            nextRetryAt = result.NextRetryAt,
+            processingDurationSeconds = result.ProcessingDurationSeconds,
+            totalDurationSeconds = result.TotalDurationSeconds
         });
     }
 
@@ -105,10 +110,15 @@ public class MeetingsController : ControllerBase
                 stage = item.Stage,
                 progress = item.Progress,
                 errorMessage = item.ErrorMessage,
+                automaticRetryCount = item.AutomaticRetryCount,
+                automaticRetryLimit = item.AutomaticRetryLimit,
+                nextRetryAt = item.NextRetryAt,
                 createdAt = item.CreatedAt,
                 updatedAt = item.UpdatedAt,
                 startedAt = item.StartedAt,
-                completedAt = item.CompletedAt
+                completedAt = item.CompletedAt,
+                processingDurationSeconds = item.ProcessingDurationSeconds,
+                totalDurationSeconds = item.TotalDurationSeconds
             })
         });
     }

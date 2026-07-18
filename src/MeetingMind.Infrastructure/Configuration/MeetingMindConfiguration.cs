@@ -189,6 +189,29 @@ public static class MeetingMindConfiguration
         return options;
     }
 
+    public static AutomaticRetryOptions ValidateAutomaticRetryOptions(AutomaticRetryOptions options)
+    {
+        if (options.DelaysInSeconds is null || options.DelaysInSeconds.Length == 0)
+        {
+            throw Invalid("AutomaticRetry:DelaysInSeconds", "must contain at least one delay");
+        }
+
+        if (options.DelaysInSeconds.Length > 10)
+        {
+            throw Invalid("AutomaticRetry:DelaysInSeconds", "must contain no more than ten delays");
+        }
+
+        for (var index = 0; index < options.DelaysInSeconds.Length; index++)
+        {
+            if (options.DelaysInSeconds[index] <= 0)
+            {
+                throw Invalid($"AutomaticRetry:DelaysInSeconds:{index}", "must be greater than zero");
+            }
+        }
+
+        return options;
+    }
+
     private static void ValidateStorageFolder(string rootPath, string folder, string settingName)
     {
         RequireText(folder, settingName, "is required");

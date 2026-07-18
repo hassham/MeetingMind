@@ -22,6 +22,12 @@ public class MeetingJob
 
     public string? HangfireJobId { get; set; }
 
+    public int AutomaticRetryCount { get; set; }
+
+    public int AutomaticRetryLimit { get; set; }
+
+    public DateTimeOffset? NextRetryAt { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public DateTimeOffset? StartedAt { get; set; }

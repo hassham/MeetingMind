@@ -2,6 +2,7 @@ using System.Text;
 using FFMpegCore;
 using MeetingMind.Application.Common.Interfaces;
 using MeetingMind.Application.Common.Options;
+using MeetingMind.Application.Common.Exceptions;
 using Whisper.net;
 using Whisper.net.Ggml;
 
@@ -27,21 +28,35 @@ public class WhisperNetTranscriptionService : ITranscriptionService
         var audioFullPath = GetSafeStorageFullPath(audioPath);
         if (!File.Exists(audioFullPath))
         {
-            throw new FileNotFoundException("Processed audio file was not found.", audioPath);
+            throw new PermanentMeetingProcessingException(
+                "Processed audio file was not found.",
+                new FileNotFoundException("Processed audio file was not found.", audioPath));
         }
 
         var modelPath = await GetModelPathAsync(cancellationToken);
-        using var whisperFactory = WhisperFactory.FromPath(modelPath);
-        using var processor = CreateProcessor(whisperFactory);
-        await using var audioStream = File.OpenRead(audioFullPath);
 
-        var transcript = new StringBuilder();
-        await foreach (var segment in processor.ProcessAsync(audioStream, cancellationToken))
+        try
         {
-            transcript.Append(segment.Text);
-        }
+            using var whisperFactory = WhisperFactory.FromPath(modelPath);
+            using var processor = CreateProcessor(whisperFactory);
+            await using var audioStream = File.OpenRead(audioFullPath);
 
-        return CleanTranscript(transcript.ToString());
+            var transcript = new StringBuilder();
+            await foreach (var segment in processor.ProcessAsync(audioStream, cancellationToken))
+            {
+                transcript.Append(segment.Text);
+            }
+
+            return CleanTranscript(transcript.ToString());
+        }
+        catch (Exception exception) when (exception is not IOException and
+                                          not OperationCanceledException and
+                                          not PermanentMeetingProcessingException)
+        {
+            throw new PermanentMeetingProcessingException(
+                "Whisper could not process the audio input or model.",
+                exception);
+        }
     }
 
     private async Task<string> GetModelPathAsync(CancellationToken cancellationToken)
@@ -51,7 +66,9 @@ public class WhisperNetTranscriptionService : ITranscriptionService
             var configuredModelPath = Path.GetFullPath(_transcriptionOptions.ModelPath);
             if (!File.Exists(configuredModelPath))
             {
-                throw new FileNotFoundException("Configured Whisper model file was not found.", configuredModelPath);
+                throw new PermanentMeetingProcessingException(
+                    "Configured Whisper model file was not found.",
+                    new FileNotFoundException("Configured Whisper model file was not found.", configuredModelPath));
             }
 
             return configuredModelPath;
@@ -71,7 +88,7 @@ public class WhisperNetTranscriptionService : ITranscriptionService
 
         if (!_transcriptionOptions.AutoDownloadModel)
         {
-            throw new InvalidOperationException(
+            throw new PermanentMeetingProcessingException(
                 "Whisper model file was not found and automatic model download is disabled.");
         }
 
@@ -103,7 +120,7 @@ public class WhisperNetTranscriptionService : ITranscriptionService
         if (!IsUsableModelFile(temporaryModelPath))
         {
             DeleteInvalidModelFile(temporaryModelPath);
-            throw new InvalidOperationException("Downloaded Whisper model file is empty or incomplete.");
+            throw new PermanentMeetingProcessingException("Downloaded Whisper model file is empty or incomplete.");
         }
 
         File.Move(temporaryModelPath, modelPath, overwrite: true);
@@ -125,7 +142,7 @@ public class WhisperNetTranscriptionService : ITranscriptionService
     {
         if (Path.IsPathRooted(relativePath))
         {
-            throw new InvalidOperationException("Storage paths must be relative.");
+            throw new PermanentMeetingProcessingException("Storage paths must be relative.");
         }
 
         var rootPath = Path.GetFullPath(_storageOptions.RootPath);
@@ -136,7 +153,7 @@ public class WhisperNetTranscriptionService : ITranscriptionService
 
         if (!fullPath.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Storage path escapes the configured root.");
+            throw new PermanentMeetingProcessingException("Storage path escapes the configured root.");
         }
 
         return fullPath;

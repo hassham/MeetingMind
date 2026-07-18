@@ -181,9 +181,10 @@ generation and final aggregation.
 queue, execution, dashboard, and retry engine. The API is a client; the Worker
 is the server.
 
-Phase 1 manual retry is implemented. Configurable automatic retry for
-classified transient failures is a P2-05 deliverable and must not be treated as
-implemented until that package is complete.
+Hangfire applies the Worker's configured automatic-retry filter. The default
+policy performs two retries after the initial execution at 10 and 60 seconds,
+excluding the typed permanent-processing exception. Manual retry remains an
+Application use case behind `IBackgroundJobService`.
 
 ## 5. Processing flows
 
@@ -234,7 +235,7 @@ Failed or Cancelled MeetingJob
 Existing transcript or minutes records are upserted when reprocessing reaches
 those stages.
 
-### 5.4 Phase 2 automatic retry target
+### 5.4 Automatic retry
 
 ```text
 Pipeline exception
@@ -245,7 +246,15 @@ Pipeline exception
   -> transient exhausted: persist final Failed state and allow safe manual retry
 ```
 
-The detailed exception taxonomy and delay policy are approved during P2-05.
+Waiting retries persist `Queued` with the failed stage, progress, safe error,
+retry count/limit, and next retry time. `StartedAt` is preserved across the
+automatic-recovery cycle. A manual retry clears retry metadata and receives a
+fresh budget.
+
+Each attempt validates durable checkpoints before repeating provider work. A
+valid transcript skips FFmpeg and Whisper. Otherwise valid processed audio
+skips FFmpeg. Missing or invalid checkpoint files fall back to the earlier safe
+stage.
 
 ## 6. Job state model
 
@@ -270,17 +279,36 @@ Stages:
 
 `CreatedAt` records job creation. `StartedAt` is assigned on first transition to
 Processing. `CompletedAt` is assigned for terminal status, and `UpdatedAt`
-tracks persisted changes. Manual retry currently clears start/completion timing.
-P2-04 defines and exposes the derived duration contract for active and terminal
-jobs.
+tracks persisted changes.
+
+P2-04 derives two non-persisted whole-second values in Application services
+using an injected .NET `TimeProvider`:
+
+- `processingDurationSeconds` measures the current or most recently completed
+  Worker attempt from `StartedAt`.
+- `totalDurationSeconds` measures elapsed time since the original `CreatedAt`,
+  including queue time and manual retries.
+
+Active endpoints use the current time. Terminal endpoints use `CompletedAt`,
+falling back to `UpdatedAt` for incomplete legacy records. Missing starts and
+negative timestamp order produce zero rather than failing a request.
+
+Manual retry preserves the previous attempt's start/completion timestamps while
+the job is queued so its final processing duration remains visible. The next
+queued-to-processing transition atomically assigns a new `StartedAt` and clears
+`CompletedAt`. Total duration remains anchored to the original creation time.
+
+Automatic retry preserves `StartedAt` and keeps processing duration live while
+the job waits in configured backoff.
 
 ## 7. Persistence model
 
 ### MeetingJob
 
 `Id`, `OriginalFileName`, `OriginalFilePath`, `ProcessedFilePath`, `Status`,
-`Stage`, `Progress`, `ErrorMessage`, `HangfireJobId`, `CreatedAt`, `StartedAt`,
-`CompletedAt`, and `UpdatedAt`.
+`Stage`, `Progress`, `ErrorMessage`, `HangfireJobId`, `AutomaticRetryCount`,
+`AutomaticRetryLimit`, `NextRetryAt`, `CreatedAt`, `StartedAt`, `CompletedAt`,
+and `UpdatedAt`.
 
 ### MeetingTranscript
 
@@ -301,8 +329,8 @@ repositories are added only for concrete use cases.
 | Method | Route | Responsibility |
 | --- | --- | --- |
 | `POST` | `/api/meetings/upload` | Validate, persist, enqueue, and return 202 |
-| `GET` | `/api/meetings/{jobId}/status` | Return status, stage, progress, error, and Phase 2 duration |
-| `GET` | `/api/meetings/history` | Return newest-first paginated history |
+| `GET` | `/api/meetings/{jobId}/status` | Return status, stage, progress, error, retry metadata, processing duration, and total duration |
+| `GET` | `/api/meetings/history` | Return newest-first paginated history with the same retry and duration fields |
 | `GET` | `/api/meetings/{jobId}/result` | Return structured minutes |
 | `GET` | `/api/meetings/{jobId}/transcript/download` | Return transcript text artifact |
 | `GET` | `/api/meetings/{jobId}/minutes/download` | Return Markdown minutes artifact |
@@ -323,8 +351,8 @@ shaping. Provider types and local paths do not cross this boundary.
   and a bounded sanitized error.
 - Logs include identifiers, stage, and exception context but not API keys, full
   transcripts, provider payloads, or physical paths.
-- P2-05 separates transient exceptions that must reach Hangfire from permanent
-  exceptions that are finalized immediately.
+- Transient and unclassified exceptions reach Hangfire; typed permanent
+  exceptions are finalized immediately and excluded from automatic retry.
 
 ## 10. Configuration
 
@@ -339,7 +367,8 @@ Configuration areas:
 - `AudioProcessing`
 - `Transcription`
 - `OpenAI`
-- Phase 2 retry and retention settings
+- `AutomaticRetry:DelaysInSeconds`
+- Phase 2 retention settings
 
 The API and Worker inherit one required absolute `Storage__RootPath` environment
 variable, ensuring both resolve the same physical artifact root. The committed
@@ -350,8 +379,9 @@ explicit existing FFmpeg path, Whisper configuration, and `OpenAI:ApiKey`.
 Startup performs shared validation before either host is built. Missing or
 invalid settings stop startup with a message naming the configuration key. The
 stub-processing delay was removed because the Worker executes the real pipeline.
-Retry policy configuration remains owned by P2-05 and retention configuration
-by P2-07.
+Automatic-retry delays are validated as a positive configured sequence; the
+sequence length is the retry limit. Retention configuration remains owned by
+P2-07.
 
 ## 11. Observability and operations
 

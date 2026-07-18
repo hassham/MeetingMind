@@ -71,6 +71,13 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
     {
         await _factory.ResetAsync();
         var job = CreateJob(MeetingJobStatus.Processing, MeetingJobStage.Transcribing, 25);
+        var now = DateTimeOffset.UtcNow;
+        job.CreatedAt = now.AddSeconds(-120);
+        job.StartedAt = now.AddSeconds(-45);
+        job.UpdatedAt = now;
+        job.AutomaticRetryCount = 1;
+        job.AutomaticRetryLimit = 2;
+        job.NextRetryAt = now.AddSeconds(60);
         await _factory.SeedAsync(job);
 
         var response = await _factory.Client.GetAsync($"/api/meetings/{job.Id}/status");
@@ -81,6 +88,13 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
         Assert.Equal("Processing", json.RootElement.GetProperty("status").GetString());
         Assert.Equal("Transcribing", json.RootElement.GetProperty("stage").GetString());
         Assert.Equal(25, json.RootElement.GetProperty("progress").GetInt32());
+        Assert.Equal(1, json.RootElement.GetProperty("automaticRetryCount").GetInt32());
+        Assert.Equal(2, json.RootElement.GetProperty("automaticRetryLimit").GetInt32());
+        Assert.Equal(
+            job.NextRetryAt?.ToUnixTimeMilliseconds(),
+            json.RootElement.GetProperty("nextRetryAt").GetDateTimeOffset().ToUnixTimeMilliseconds());
+        Assert.InRange(json.RootElement.GetProperty("processingDurationSeconds").GetInt64(), 45, 50);
+        Assert.InRange(json.RootElement.GetProperty("totalDurationSeconds").GetInt64(), 120, 125);
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
     }
 
@@ -90,6 +104,13 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
         await _factory.ResetAsync();
         var older = CreateJob(createdAt: DateTimeOffset.UtcNow.AddMinutes(-2));
         var newer = CreateJob(createdAt: DateTimeOffset.UtcNow);
+        newer.Status = MeetingJobStatus.Completed;
+        newer.Stage = MeetingJobStage.Completed;
+        newer.StartedAt = newer.CreatedAt.AddSeconds(10);
+        newer.CompletedAt = newer.CreatedAt.AddSeconds(30);
+        newer.UpdatedAt = newer.CompletedAt.Value;
+        newer.AutomaticRetryCount = 1;
+        newer.AutomaticRetryLimit = 2;
         await _factory.SeedAsync(older, newer);
 
         var response = await _factory.Client.GetAsync("/api/meetings/history?skip=0&take=1");
@@ -101,6 +122,11 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
         Assert.Equal(1, json.RootElement.GetProperty("take").GetInt32());
         Assert.Equal(2, json.RootElement.GetProperty("total").GetInt32());
         Assert.Equal(newer.Id, items[0].GetProperty("jobId").GetGuid());
+        Assert.Equal(1, items[0].GetProperty("automaticRetryCount").GetInt32());
+        Assert.Equal(2, items[0].GetProperty("automaticRetryLimit").GetInt32());
+        Assert.Equal(JsonValueKind.Null, items[0].GetProperty("nextRetryAt").ValueKind);
+        Assert.Equal(20, items[0].GetProperty("processingDurationSeconds").GetInt64());
+        Assert.Equal(30, items[0].GetProperty("totalDurationSeconds").GetInt64());
     }
 
     [Fact]

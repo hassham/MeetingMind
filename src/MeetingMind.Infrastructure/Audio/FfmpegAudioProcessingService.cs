@@ -1,6 +1,7 @@
 using FFMpegCore;
 using MeetingMind.Application.Common.Interfaces;
 using MeetingMind.Application.Common.Options;
+using MeetingMind.Application.Common.Exceptions;
 
 namespace MeetingMind.Infrastructure.Audio;
 
@@ -35,7 +36,9 @@ public class FfmpegAudioProcessingService : IAudioProcessingService
         var inputFullPath = GetSafeFullPath(inputPath);
         if (!File.Exists(inputFullPath))
         {
-            throw new FileNotFoundException("Uploaded audio file was not found.", inputPath);
+            throw new PermanentMeetingProcessingException(
+                "Uploaded audio file was not found.",
+                new FileNotFoundException("Uploaded audio file was not found.", inputPath));
         }
 
         var outputFileName = $"{Guid.NewGuid():N}{NormalizeExtension(_audioProcessingOptions.OutputExtension)}";
@@ -74,7 +77,7 @@ public class FfmpegAudioProcessingService : IAudioProcessingService
     {
         if (Path.IsPathRooted(relativePath))
         {
-            throw new InvalidOperationException("Storage paths must be relative.");
+            throw new PermanentMeetingProcessingException("Storage paths must be relative.");
         }
 
         var rootPath = Path.GetFullPath(_storageOptions.RootPath);
@@ -85,7 +88,7 @@ public class FfmpegAudioProcessingService : IAudioProcessingService
 
         if (!fullPath.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Storage path escapes the configured root.");
+            throw new PermanentMeetingProcessingException("Storage path escapes the configured root.");
         }
 
         return fullPath;

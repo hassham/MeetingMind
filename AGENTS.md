@@ -98,10 +98,10 @@ The processing chain is decoupled as:
 Whisper.net transcription -> OpenAI GPT meeting-minutes generation -> save
 results`.
 
-Phase 1 supports manual retry. Phase 2 adds configurable automatic retry for
-classified transient failures while retaining manual retry for failed or
-cancelled jobs. Until P2-05 is complete, do not describe automatic retry as
-implemented behavior.
+Phase 1 manual retry remains available for failed or cancelled jobs. P2-05 adds
+two configurable Hangfire retries (10 and 60 seconds by default) for classified
+transient and bounded unclassified failures. Permanent failures run once;
+exhausted failures remain manually retryable with a fresh automatic budget.
 
 ## Data model (summary — see SAD §7 / FSD §5 for full field lists)
 

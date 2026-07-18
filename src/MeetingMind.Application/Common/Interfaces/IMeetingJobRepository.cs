@@ -34,6 +34,30 @@ public interface IMeetingJobRepository
 
     Task ResetForRetryAsync(Guid meetingJobId, CancellationToken cancellationToken);
 
+    Task BeginProcessingAsync(
+        Guid meetingJobId,
+        int automaticRetryLimit,
+        CancellationToken cancellationToken);
+
+    Task ScheduleAutomaticRetryAsync(
+        Guid meetingJobId,
+        MeetingJobStage stage,
+        int progress,
+        string errorMessage,
+        int automaticRetryCount,
+        int automaticRetryLimit,
+        DateTimeOffset nextRetryAt,
+        CancellationToken cancellationToken);
+
+    Task RecordFinalFailureAsync(
+        Guid meetingJobId,
+        MeetingJobStage stage,
+        int progress,
+        string errorMessage,
+        int automaticRetryCount,
+        int automaticRetryLimit,
+        CancellationToken cancellationToken);
+
     Task UpdateStatusAsync(
         Guid meetingJobId,
         MeetingJobStatus status,

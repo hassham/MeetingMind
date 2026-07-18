@@ -39,6 +39,8 @@ type JobStatusResponse = {
   stage: string
   progress: number
   errorMessage: string | null
+  processingDurationSeconds: number
+  totalDurationSeconds: number
 }
 
 type HistoryItem = {
@@ -52,6 +54,8 @@ type HistoryItem = {
   updatedAt: string
   startedAt: string | null
   completedAt: string | null
+  processingDurationSeconds: number
+  totalDurationSeconds: number
 }
 
 type HistoryResponse = {
@@ -120,10 +124,18 @@ function App() {
   const [isResultLoading, setIsResultLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [liveDurationOffsetSeconds, setLiveDurationOffsetSeconds] = useState(0)
 
   const selectedJobId = selectedJob?.jobId ?? selectedHistoryItem?.jobId ?? null
   const canRetry = selectedJob ? retryableStatuses.has(selectedJob.status) : false
   const isPolling = selectedJob ? activeStatuses.has(selectedJob.status) : false
+  const selectedProcessingDurationSeconds = selectedJob
+    ? selectedJob.processingDurationSeconds +
+      (selectedJob.status === 'Processing' ? liveDurationOffsetSeconds : 0)
+    : 0
+  const selectedTotalDurationSeconds = selectedJob
+    ? selectedJob.totalDurationSeconds + (isPolling ? liveDurationOffsetSeconds : 0)
+    : 0
 
   const selectedFileName = useMemo(() => {
     if (!selectedJobId) {
@@ -179,6 +191,7 @@ function App() {
     async (jobId: string) => {
       const response = await axios.get<JobStatusResponse>(`/api/meetings/${jobId}/status`)
       setSelectedJob(response.data)
+      setLiveDurationOffsetSeconds(0)
 
       if (response.data.status === 'Completed') {
         await loadResults(jobId)
@@ -197,7 +210,10 @@ function App() {
       stage: item.stage,
       progress: item.progress,
       errorMessage: item.errorMessage,
+      processingDurationSeconds: item.processingDurationSeconds,
+      totalDurationSeconds: item.totalDurationSeconds,
     })
+    setLiveDurationOffsetSeconds(0)
     setMinutes(null)
     setTranscript(null)
     setMessage(null)
@@ -235,6 +251,8 @@ function App() {
         updatedAt: new Date().toISOString(),
         startedAt: null,
         completedAt: null,
+        processingDurationSeconds: 0,
+        totalDurationSeconds: 0,
       })
       setSelectedJob({
         jobId: job.jobId,
@@ -242,7 +260,10 @@ function App() {
         stage: job.stage,
         progress: 0,
         errorMessage: null,
+        processingDurationSeconds: 0,
+        totalDurationSeconds: 0,
       })
+      setLiveDurationOffsetSeconds(0)
       setMessage('Upload accepted. Processing has started.')
       await loadHistory()
       await loadStatus(job.jobId)
@@ -259,13 +280,20 @@ function App() {
 
     try {
       const response = await axios.post<UploadResponse>(`/api/meetings/${jobId}/retry`)
+      const previousJob =
+        selectedJob?.jobId === jobId
+          ? selectedJob
+          : history.find((item) => item.jobId === jobId)
       setSelectedJob({
         jobId: response.data.jobId,
         status: response.data.status,
         stage: response.data.stage,
         progress: 0,
         errorMessage: null,
+        processingDurationSeconds: previousJob?.processingDurationSeconds ?? 0,
+        totalDurationSeconds: previousJob?.totalDurationSeconds ?? 0,
       })
+      setLiveDurationOffsetSeconds(0)
       setMinutes(null)
       setTranscript(null)
       setMessage('Retry queued. Processing has restarted.')
@@ -295,6 +323,18 @@ function App() {
 
     return () => window.clearInterval(timerId)
   }, [isPolling, loadStatus, selectedJobId])
+
+  useEffect(() => {
+    if (!selectedJobId || !isPolling) {
+      return
+    }
+
+    const timerId = window.setInterval(() => {
+      setLiveDurationOffsetSeconds((current) => current + 1)
+    }, 1000)
+
+    return () => window.clearInterval(timerId)
+  }, [isPolling, selectedJobId])
 
   return (
     <ThemeProvider theme={theme}>
@@ -401,6 +441,10 @@ function App() {
                                   {formatDate(item.createdAt)}
                                 </Typography>
                               </Stack>
+                              <Typography variant="body2" color="text.secondary">
+                                {formatDuration(item.processingDurationSeconds)} processing ·{' '}
+                                {formatDuration(item.totalDurationSeconds)} total
+                              </Typography>
                             </Stack>
                           </button>
 
@@ -478,12 +522,20 @@ function App() {
                           <Box>
                             <Typography fontWeight={700}>Processing details</Typography>
                             <Typography variant="body2" color="text.secondary">
-                              Created, started, completed, and updated dates
+                              Processing and total elapsed time with lifecycle dates
                             </Typography>
                           </Box>
                         </AccordionSummary>
                         <AccordionDetails id="processing-details-content">
                           <Stack className="metadata-grid">
+                            <Metadata
+                              label="Processing duration"
+                              value={formatDuration(selectedProcessingDurationSeconds)}
+                            />
+                            <Metadata
+                              label="Total duration"
+                              value={formatDuration(selectedTotalDurationSeconds)}
+                            />
                             <Metadata label="Created" value={formatDate(selectedHistoryItem?.createdAt)} />
                             <Metadata label="Started" value={formatDate(selectedHistoryItem?.startedAt)} />
                             <Metadata label="Completed" value={formatDate(selectedHistoryItem?.completedAt)} />
@@ -736,6 +788,25 @@ function formatDate(value: string | null | undefined) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
+}
+
+function formatDuration(totalSeconds: number) {
+  const normalizedSeconds = Math.max(0, Math.floor(totalSeconds || 0))
+  const hours = Math.floor(normalizedSeconds / 3600)
+  const minutes = Math.floor((normalizedSeconds % 3600) / 60)
+  const seconds = normalizedSeconds % 60
+
+  if (hours > 0) {
+    return `${hours}h ${minutes.toString().padStart(2, '0')}m ${seconds
+      .toString()
+      .padStart(2, '0')}s`
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds.toString().padStart(2, '0')}s`
+  }
+
+  return `${seconds}s`
 }
 
 function getRequestErrorMessage(requestError: unknown, fallback: string) {

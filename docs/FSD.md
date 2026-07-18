@@ -73,9 +73,26 @@ Supported statuses are `Queued`, `Processing`, `Completed`, `Failed`, and
 
 Each job maintains progress from 0 to 100, current stage, a sanitized error
 when applicable, creation/update timestamps, and optional start/completion
-timestamps. Phase 2 must expose a documented processing duration through status
-and history responses and display it in the frontend. Retry must reset timing in
-accordance with the approved duration semantics.
+timestamps. Status and history expose `processingDurationSeconds` and
+`totalDurationSeconds` as non-negative whole numbers.
+
+- Processing duration measures Worker execution. It is zero before the first
+  attempt starts, live from `StartedAt` while processing, and final at
+  `CompletedAt` for terminal jobs. A missing terminal completion falls back to
+  `UpdatedAt`; a missing start produces zero.
+- Total duration measures elapsed time from the original `CreatedAt`, including
+  queue time and manual retries. It is live for queued/processing jobs and final
+  for terminal jobs, using the same completion fallback.
+- Manual retry retains the previous attempt's final processing duration while
+  queued. The first transition into processing resets `StartedAt`, clears the
+  previous completion, and starts the new attempt at zero. Total duration never
+  resets because it remains anchored to the original upload.
+- Automatic retries preserve `StartedAt`, so processing duration remains live
+  through configured backoff and subsequent automatic attempts.
+
+The frontend displays both values in history and processing details. The
+selected active job advances locally once per second between authoritative API
+polls.
 
 ### FR-005 — Audio transcoding
 
@@ -118,10 +135,13 @@ Manual retry remains available for `Failed` and `Cancelled` jobs and reuses the
 same MeetingMind job ID and original upload. It resets processing state and
 stores the new Hangfire job ID.
 
-Phase 2 adds configured automatic retries for classified transient failures.
-Permanent failures must not be retried automatically. When automatic attempts
-are exhausted, the job must retain its final failed stage and sanitized error
-and remain eligible for manual retry when the original input is still present.
+The Worker applies two configured automatic retries after the initial execution,
+using default delays of 10 and 60 seconds. Permanent failures are excluded from
+automatic retry. Unknown failures use the same bounded retry policy. A waiting
+retry is `Queued` at its last stage and progress with its safe error and retry
+metadata retained. Exhausted failures retain their final stage and sanitized
+error and remain eligible for manual retry when the original input is present.
+Manual retry resets the retry count and grants a fresh configured budget.
 
 ### FR-010 — Processing history
 
@@ -152,8 +172,9 @@ status is not retryable returns 409.
 ### MeetingJob
 
 `Id`, `OriginalFileName`, `OriginalFilePath`, `ProcessedFilePath`, `Status`,
-`Stage`, `Progress`, `ErrorMessage`, `HangfireJobId`, `CreatedAt`, `StartedAt`,
-`CompletedAt`, and `UpdatedAt`.
+`Stage`, `Progress`, `ErrorMessage`, `HangfireJobId`, `AutomaticRetryCount`,
+`AutomaticRetryLimit`, `NextRetryAt`, `CreatedAt`, `StartedAt`, `CompletedAt`,
+and `UpdatedAt`.
 
 ### MeetingTranscript
 
@@ -182,8 +203,17 @@ Every final failure records job status, stage, progress, a bounded sanitized
 error, and logs containing the job ID and exception context. Routine logs must
 not include full transcripts, secrets, provider payloads, or local paths.
 
-P2-05 defines the concrete exception classification, attempt count, and delay
-policy before retry implementation begins.
+Temporary storage I/O, FFmpeg/Whisper interruptions, retryable OpenAI responses,
+network timeouts, and transient persistence faults are eligible for automatic
+retry. Missing or corrupt inputs, unsafe paths, access/capacity failures,
+invalid configuration, unsupported media, provider authentication/validation
+failures, malformed AI output, and non-transient persistence failures are
+permanent. Unclassified exceptions are treated as transient but remain bounded
+by the configured two-retry limit.
+
+Before repeating work, the Worker validates and reuses the latest durable
+checkpoint: a stored transcript first, otherwise processed audio. Invalid or
+missing checkpoint artifacts fall back to the nearest safe earlier stage.
 
 ## 7. Non-functional requirements
 

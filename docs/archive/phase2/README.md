@@ -27,3 +27,9 @@ new product features are outside Phase 2.
   - local-key remediation, shared storage configuration, local database
   defaults, FFmpeg discovery, Whisper provisioning, OpenAI key configuration,
   and removal of the stub-processing delay.
+- [`QUESTIONS_p2_04_processing_duration.md`](QUESTIONS_p2_04_processing_duration.md)
+  - processing versus total duration, incomplete timestamp fallbacks, manual
+  retry timing, contract units, clock injection, and live frontend display.
+- [`QUESTIONS_p2_05_reliable_automatic_retries.md`](QUESTIONS_p2_05_reliable_automatic_retries.md)
+  - failure classification, unknown-exception behavior, retry budget and state,
+  persisted retry metadata, checkpoint resume, and renewed manual-retry budget.

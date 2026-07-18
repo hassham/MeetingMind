@@ -1,5 +1,6 @@
 using System.Text.Json;
 using MeetingMind.Application.Common.Interfaces;
+using MeetingMind.Application.Common.Exceptions;
 using MeetingMind.Application.Common.Options;
 using MeetingMind.Application.Meetings;
 using OpenAI.Chat;
@@ -19,13 +20,13 @@ public class OpenAiMeetingMinutesService : IMeetingMinutesService
 
         if (string.IsNullOrWhiteSpace(_openAiOptions.ApiKey))
         {
-            throw new InvalidOperationException(
+            throw new PermanentMeetingProcessingException(
                 "OpenAI API key is required. Configure OpenAI:ApiKey.");
         }
 
         if (string.IsNullOrWhiteSpace(_openAiOptions.Model))
         {
-            throw new InvalidOperationException("OpenAI model is required.");
+            throw new PermanentMeetingProcessingException("OpenAI model is required.");
         }
 
         _chatClient = new ChatClient(_openAiOptions.Model, _openAiOptions.ApiKey);
@@ -37,12 +38,12 @@ public class OpenAiMeetingMinutesService : IMeetingMinutesService
     {
         if (string.IsNullOrWhiteSpace(transcriptText))
         {
-            throw new InvalidOperationException("Transcript is empty; meeting minutes cannot be generated.");
+            throw new PermanentMeetingProcessingException("Transcript is empty; meeting minutes cannot be generated.");
         }
 
         if (transcriptText.Length > _openAiOptions.MaxTranscriptCharactersForMinutes)
         {
-            throw new InvalidOperationException(
+            throw new PermanentMeetingProcessingException(
                 "Transcript is too long for single-pass meeting minutes generation. Chunking is not implemented yet.");
         }
 
@@ -123,7 +124,7 @@ public class OpenAiMeetingMinutesService : IMeetingMinutesService
 
             return Validate(minutes);
         }
-        catch (Exception exception) when (exception is not InvalidOperationException)
+        catch (Exception exception) when (exception is not PermanentMeetingProcessingException)
         {
             throw new InvalidOperationException(
                 $"OpenAI meeting minutes generation failed: {exception.Message}",
@@ -135,17 +136,17 @@ public class OpenAiMeetingMinutesService : IMeetingMinutesService
     {
         if (minutes is null)
         {
-            throw new InvalidOperationException("OpenAI meeting minutes response was empty or invalid.");
+            throw new PermanentMeetingProcessingException("OpenAI meeting minutes response was empty or invalid.");
         }
 
         if (string.IsNullOrWhiteSpace(minutes.Title))
         {
-            throw new InvalidOperationException("OpenAI meeting minutes response did not include a title.");
+            throw new PermanentMeetingProcessingException("OpenAI meeting minutes response did not include a title.");
         }
 
         if (string.IsNullOrWhiteSpace(minutes.Summary))
         {
-            throw new InvalidOperationException("OpenAI meeting minutes response did not include a summary.");
+            throw new PermanentMeetingProcessingException("OpenAI meeting minutes response did not include a summary.");
         }
 
         return minutes;

@@ -7,7 +7,7 @@ Phase 2 decisions are preserved under
 
 Status legend: `TODO` | `IN PROGRESS` | `BLOCKED` | `PARTIAL` | `DONE`
 
-Last verified against code: 2026-07-17.
+Last verified against code: 2026-07-18.
 
 ## Current delivery cycle: Phase 2
 
@@ -91,8 +91,8 @@ Phase 2 is complete only when:
 
 ## Current focus
 
-P2-04 is next. It requires task-specific discovery before duration semantics
-and contract changes begin.
+P2-06 is next. It requires task-specific discovery before long-transcript
+chunking and hierarchical aggregation begin.
 
 ## Ordered Phase 2 work packages
 
@@ -143,35 +143,35 @@ and contract changes begin.
 
 ### P2-04 - Complete processing-duration tracking
 
-- [ ] Define duration semantics for queued, processing, completed, failed,
+- [x] Define duration semantics for queued, processing, completed, failed,
       cancelled, and manually retried jobs.
-      Status: TODO.
-- [ ] Expose duration consistently through status and history application/API
+      Status: DONE. Completed: 2026-07-18.
+- [x] Expose duration consistently through status and history application/API
       contracts without exposing infrastructure details.
-      Status: TODO.
-- [ ] Display live or final duration in the frontend processing details.
-      Status: TODO.
-- [ ] Add unit, contract, and frontend tests for duration calculation and
+      Status: DONE. Completed: 2026-07-18.
+- [x] Display live or final duration in the frontend processing details.
+      Status: DONE. Completed: 2026-07-18.
+- [x] Add unit, contract, and frontend tests for duration calculation and
       formatting.
-      Status: TODO.
+      Status: DONE. Completed: 2026-07-18.
 
 ### P2-05 - Implement reliable automatic retries
 
-- [ ] Define transient and permanent failure categories for storage, FFmpeg,
+- [x] Define transient and permanent failure categories for storage, FFmpeg,
       Whisper, OpenAI, and persistence operations.
-      Status: TODO.
-- [ ] Add configurable Hangfire retry attempts and delays without removing the
+      Status: DONE. Completed: 2026-07-18.
+- [x] Add configurable Hangfire retry attempts and delays without removing the
       existing manual retry workflow.
-      Status: TODO.
-- [ ] Ensure exceptions reach Hangfire when retry is appropriate while job
+      Status: DONE. Completed: 2026-07-18.
+- [x] Ensure exceptions reach Hangfire when retry is appropriate while job
       status, stage, progress, timestamps, and sanitized errors remain correct.
-      Status: TODO.
-- [ ] Prevent permanent failures from being retried automatically and make
+      Status: DONE. Completed: 2026-07-18.
+- [x] Prevent permanent failures from being retried automatically and make
       exhausted-retry state clear to users and operators.
-      Status: TODO.
-- [ ] Add tests for transient success-after-retry, permanent failure, exhausted
+      Status: DONE. Completed: 2026-07-18.
+- [x] Add tests for transient success-after-retry, permanent failure, exhausted
       retries, and later manual retry.
-      Status: TODO.
+      Status: DONE. Completed: 2026-07-18.
 
 ### P2-06 - Support long meetings
 

@@ -8,6 +8,8 @@ public interface IFileStorageService
 
     Task<string> SaveMinutesAsync(Guid meetingJobId, string minutesMarkdown, CancellationToken cancellationToken);
 
+    Task<bool> ExistsAsync(string filePath, CancellationToken cancellationToken);
+
     Task<Stream> ReadAsync(string filePath, CancellationToken cancellationToken);
 
     Task DeleteAsync(string filePath, CancellationToken cancellationToken);

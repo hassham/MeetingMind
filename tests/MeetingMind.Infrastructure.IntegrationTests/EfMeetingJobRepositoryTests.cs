@@ -104,7 +104,7 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
     }
 
     [Fact]
-    public async Task ResetForRetryClearsExecutionStateAndKeepsIdentity()
+    public async Task ResetForRetryPreservesPreviousTimingUntilNewAttemptStarts()
     {
         await _fixture.ResetAsync();
         await using var dbContext = _fixture.CreateDbContext();
@@ -115,8 +115,13 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
         job.Progress = 60;
         job.ErrorMessage = "temporary failure";
         job.HangfireJobId = "old-hangfire-id";
-        job.StartedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
-        job.CompletedAt = DateTimeOffset.UtcNow;
+        job.AutomaticRetryCount = 2;
+        job.AutomaticRetryLimit = 2;
+        job.NextRetryAt = DateTimeOffset.UtcNow.AddMinutes(1);
+        var previousStartedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var previousCompletedAt = DateTimeOffset.UtcNow;
+        job.StartedAt = previousStartedAt;
+        job.CompletedAt = previousCompletedAt;
         await repository.AddAsync(job, CancellationToken.None);
 
         await repository.ResetForRetryAsync(job.Id, CancellationToken.None);
@@ -129,8 +134,80 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
         Assert.Equal(0, reset.Progress);
         Assert.Null(reset.ErrorMessage);
         Assert.Null(reset.HangfireJobId);
-        Assert.Null(reset.StartedAt);
-        Assert.Null(reset.CompletedAt);
+        Assert.Equal(0, reset.AutomaticRetryCount);
+        Assert.Equal(0, reset.AutomaticRetryLimit);
+        Assert.Null(reset.NextRetryAt);
+        Assert.Equal(previousStartedAt.ToUnixTimeSeconds(), reset.StartedAt?.ToUnixTimeSeconds());
+        Assert.Equal(previousCompletedAt.ToUnixTimeSeconds(), reset.CompletedAt?.ToUnixTimeSeconds());
+
+        await repository.BeginProcessingAsync(
+            job.Id,
+            2,
+            CancellationToken.None);
+        var restarted = await repository.GetByIdAsync(job.Id, CancellationToken.None);
+
+        Assert.NotNull(restarted);
+        Assert.True(restarted.StartedAt > previousCompletedAt);
+        Assert.Null(restarted.CompletedAt);
+        Assert.Equal(2, restarted.AutomaticRetryLimit);
+    }
+
+    [Fact]
+    public async Task AutomaticRetryPreservesTimingAndPersistsScheduledAndFinalStates()
+    {
+        await _fixture.ResetAsync();
+        await using var dbContext = _fixture.CreateDbContext();
+        var repository = new EfMeetingJobRepository(dbContext);
+        var job = CreateJob("automatic-retry.mp3");
+        await repository.AddAsync(job, CancellationToken.None);
+
+        await repository.BeginProcessingAsync(job.Id, 2, CancellationToken.None);
+        var started = await repository.GetByIdAsync(job.Id, CancellationToken.None);
+        Assert.NotNull(started?.StartedAt);
+
+        var nextRetryAt = DateTimeOffset.UtcNow.AddSeconds(10);
+        await repository.ScheduleAutomaticRetryAsync(
+            job.Id,
+            MeetingJobStage.Transcribing,
+            25,
+            "Temporary transcription failure.",
+            1,
+            2,
+            nextRetryAt,
+            CancellationToken.None);
+
+        var scheduled = await repository.GetByIdAsync(job.Id, CancellationToken.None);
+        Assert.NotNull(scheduled);
+        Assert.Equal(MeetingJobStatus.Queued, scheduled.Status);
+        Assert.Equal(MeetingJobStage.Transcribing, scheduled.Stage);
+        Assert.Equal(1, scheduled.AutomaticRetryCount);
+        Assert.Equal(2, scheduled.AutomaticRetryLimit);
+        Assert.Equal(nextRetryAt.ToUnixTimeSeconds(), scheduled.NextRetryAt?.ToUnixTimeSeconds());
+        Assert.Equal(started!.StartedAt?.ToUnixTimeSeconds(), scheduled.StartedAt?.ToUnixTimeSeconds());
+        Assert.Null(scheduled.CompletedAt);
+
+        await repository.BeginProcessingAsync(job.Id, 2, CancellationToken.None);
+        var resumed = await repository.GetByIdAsync(job.Id, CancellationToken.None);
+        Assert.NotNull(resumed);
+        Assert.Equal(MeetingJobStatus.Processing, resumed.Status);
+        Assert.Equal(started.StartedAt?.ToUnixTimeSeconds(), resumed.StartedAt?.ToUnixTimeSeconds());
+        Assert.Null(resumed.NextRetryAt);
+
+        await repository.RecordFinalFailureAsync(
+            job.Id,
+            MeetingJobStage.Transcribing,
+            25,
+            "Retries exhausted.",
+            2,
+            2,
+            CancellationToken.None);
+
+        var failed = await repository.GetByIdAsync(job.Id, CancellationToken.None);
+        Assert.NotNull(failed);
+        Assert.Equal(MeetingJobStatus.Failed, failed.Status);
+        Assert.Equal(2, failed.AutomaticRetryCount);
+        Assert.Null(failed.NextRetryAt);
+        Assert.NotNull(failed.CompletedAt);
     }
 
     [Fact]

@@ -8,10 +8,14 @@ public class MeetingHistoryService : IMeetingHistoryService
     private const int MaxTake = 100;
 
     private readonly IMeetingJobRepository _meetingJobRepository;
+    private readonly TimeProvider _timeProvider;
 
-    public MeetingHistoryService(IMeetingJobRepository meetingJobRepository)
+    public MeetingHistoryService(
+        IMeetingJobRepository meetingJobRepository,
+        TimeProvider timeProvider)
     {
         _meetingJobRepository = meetingJobRepository;
+        _timeProvider = timeProvider;
     }
 
     public async Task<MeetingHistoryResult> GetHistoryAsync(
@@ -27,20 +31,36 @@ public class MeetingHistoryService : IMeetingHistoryService
             cancellationToken);
         var total = await _meetingJobRepository.CountAsync(cancellationToken);
 
+        var now = _timeProvider.GetUtcNow();
+
         return new MeetingHistoryResult(
             normalizedSkip,
             normalizedTake,
             total,
-            items.Select(item => new MeetingHistoryItem(
-                item.Id,
-                item.OriginalFileName,
-                item.Status.ToString(),
-                item.Stage.ToString(),
-                item.Progress,
-                item.ErrorMessage,
-                item.CreatedAt,
-                item.UpdatedAt,
-                item.StartedAt,
-                item.CompletedAt)).ToArray());
+            items.Select(item => CreateHistoryItem(item, now)).ToArray());
+    }
+
+    private static MeetingHistoryItem CreateHistoryItem(
+        Domain.Entities.MeetingJob item,
+        DateTimeOffset now)
+    {
+        var duration = MeetingDurationCalculator.Calculate(item, now);
+
+        return new MeetingHistoryItem(
+            item.Id,
+            item.OriginalFileName,
+            item.Status.ToString(),
+            item.Stage.ToString(),
+            item.Progress,
+            item.ErrorMessage,
+            item.AutomaticRetryCount,
+            item.AutomaticRetryLimit,
+            item.NextRetryAt,
+            item.CreatedAt,
+            item.UpdatedAt,
+            item.StartedAt,
+            item.CompletedAt,
+            duration.ProcessingDurationSeconds,
+            duration.TotalDurationSeconds);
     }
 }

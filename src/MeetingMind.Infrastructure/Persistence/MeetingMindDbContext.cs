@@ -31,6 +31,8 @@ namespace MeetingMind.Infrastructure.Persistence
                 entity.Property(job => job.ErrorMessage).HasMaxLength(4000);
                 entity.Property(job => job.HangfireJobId).HasMaxLength(128);
                 entity.Property(job => job.Progress).IsRequired();
+                entity.Property(job => job.AutomaticRetryCount).IsRequired();
+                entity.Property(job => job.AutomaticRetryLimit).IsRequired();
                 entity.Property(job => job.CreatedAt).IsRequired();
                 entity.Property(job => job.UpdatedAt).IsRequired();
 

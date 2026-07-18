@@ -5,4 +5,9 @@ public sealed record MeetingJobStatusResult(
     string Status,
     string Stage,
     int Progress,
-    string? ErrorMessage);
+    string? ErrorMessage,
+    int AutomaticRetryCount,
+    int AutomaticRetryLimit,
+    DateTimeOffset? NextRetryAt,
+    long ProcessingDurationSeconds,
+    long TotalDurationSeconds);

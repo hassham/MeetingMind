@@ -8,7 +8,13 @@ import { server } from './test/server'
 const jobId = '11111111-1111-1111-1111-111111111111'
 const now = '2026-07-17T00:00:00Z'
 
-function historyItem(status: string, stage: string, progress: number) {
+function historyItem(
+  status: string,
+  stage: string,
+  progress: number,
+  processingDurationSeconds = 65,
+  totalDurationSeconds = 185,
+) {
   return {
     jobId,
     originalFileName: 'planning.mp3',
@@ -20,6 +26,8 @@ function historyItem(status: string, stage: string, progress: number) {
     updatedAt: now,
     startedAt: status === 'Queued' ? null : now,
     completedAt: status === 'Completed' || status === 'Failed' ? now : null,
+    processingDurationSeconds,
+    totalDurationSeconds,
   }
 }
 
@@ -39,6 +47,8 @@ function completedStatus() {
     stage: 'Completed',
     progress: 100,
     errorMessage: null,
+    processingDurationSeconds: 125,
+    totalDurationSeconds: 185,
   }
 }
 
@@ -93,6 +103,8 @@ describe('MeetingMind workflow', () => {
           stage: 'Uploaded',
           progress: 0,
           errorMessage: null,
+          processingDurationSeconds: 0,
+          totalDurationSeconds: 3,
         }),
       ),
     )
@@ -168,6 +180,8 @@ describe('MeetingMind workflow', () => {
           stage: 'Uploaded',
           progress: 0,
           errorMessage: null,
+          processingDurationSeconds: 65,
+          totalDurationSeconds: 190,
         }),
       ),
     )
@@ -241,6 +255,8 @@ describe('MeetingMind workflow', () => {
                 stage: 'Transcribing',
                 progress: 25,
                 errorMessage: null,
+                processingDurationSeconds: 10,
+                totalDurationSeconds: 70,
               }
             : completedStatus(),
         )
@@ -256,6 +272,70 @@ describe('MeetingMind workflow', () => {
     expect((await screen.findAllByText('Transcribing')).length).toBeGreaterThan(0)
     expect(await screen.findByText('Sprint Planning', {}, { timeout: 7000 })).toBeInTheDocument()
     expect(statusRequests).toBeGreaterThanOrEqual(2)
+  })
+
+  it('formats processing and total duration in history and selected details', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.get('*/api/meetings/history', () =>
+        HttpResponse.json(
+          historyResponse(historyItem('Completed', 'Completed', 100, 125, 3723)),
+        ),
+      ),
+      http.get('*/api/meetings/:id/status', () =>
+        HttpResponse.json({
+          ...completedStatus(),
+          processingDurationSeconds: 125,
+          totalDurationSeconds: 3723,
+        }),
+      ),
+      http.get('*/api/meetings/:id/result', () => HttpResponse.json(minutesResult())),
+      http.get('*/api/meetings/:id/transcript/download', () =>
+        HttpResponse.text('Transcript content'),
+      ),
+    )
+    render(<App />)
+
+    expect(
+      await screen.findByText('2m 05s processing · 1h 02m 03s total'),
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /planning\.mp3/i }))
+    await user.click(screen.getByRole('button', { name: /processing details/i }))
+
+    expect(screen.getByText('Processing duration')).toBeInTheDocument()
+    expect(screen.getByText('Total duration')).toBeInTheDocument()
+    expect(screen.getAllByText('2m 05s').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('1h 02m 03s').length).toBeGreaterThan(0)
+  })
+
+  it('ticks active selected duration every second between API polls', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.get('*/api/meetings/history', () =>
+        HttpResponse.json(
+          historyResponse(historyItem('Processing', 'Transcribing', 25, 10, 70)),
+        ),
+      ),
+      http.get('*/api/meetings/:id/status', () =>
+        HttpResponse.json({
+          jobId,
+          status: 'Processing',
+          stage: 'Transcribing',
+          progress: 25,
+          errorMessage: null,
+          processingDurationSeconds: 10,
+          totalDurationSeconds: 70,
+        }),
+      ),
+    )
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /planning\.mp3/i }))
+    await user.click(screen.getByRole('button', { name: /processing details/i }))
+    expect(screen.getByText('10s')).toBeInTheDocument()
+
+    expect(await screen.findByText('11s', {}, { timeout: 2500 })).toBeInTheDocument()
+    expect(screen.getByText('1m 11s')).toBeInTheDocument()
   })
 
   it('shows a history API error without crashing the workspace', async () => {

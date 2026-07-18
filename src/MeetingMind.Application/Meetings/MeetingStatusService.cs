@@ -5,10 +5,14 @@ namespace MeetingMind.Application.Meetings;
 public class MeetingStatusService : IMeetingStatusService
 {
     private readonly IMeetingJobRepository _meetingJobRepository;
+    private readonly TimeProvider _timeProvider;
 
-    public MeetingStatusService(IMeetingJobRepository meetingJobRepository)
+    public MeetingStatusService(
+        IMeetingJobRepository meetingJobRepository,
+        TimeProvider timeProvider)
     {
         _meetingJobRepository = meetingJobRepository;
+        _timeProvider = timeProvider;
     }
 
     public async Task<MeetingJobStatusResult?> GetStatusAsync(Guid jobId, CancellationToken cancellationToken)
@@ -19,11 +23,18 @@ public class MeetingStatusService : IMeetingStatusService
             return null;
         }
 
+        var duration = MeetingDurationCalculator.Calculate(meetingJob, _timeProvider.GetUtcNow());
+
         return new MeetingJobStatusResult(
             meetingJob.Id,
             meetingJob.Status.ToString(),
             meetingJob.Stage.ToString(),
             meetingJob.Progress,
-            meetingJob.ErrorMessage);
+            meetingJob.ErrorMessage,
+            meetingJob.AutomaticRetryCount,
+            meetingJob.AutomaticRetryLimit,
+            meetingJob.NextRetryAt,
+            duration.ProcessingDurationSeconds,
+            duration.TotalDurationSeconds);
     }
 }

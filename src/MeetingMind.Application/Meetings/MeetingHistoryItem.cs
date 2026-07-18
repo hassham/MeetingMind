@@ -7,7 +7,12 @@ public sealed record MeetingHistoryItem(
     string Stage,
     int Progress,
     string? ErrorMessage,
+    int AutomaticRetryCount,
+    int AutomaticRetryLimit,
+    DateTimeOffset? NextRetryAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     DateTimeOffset? StartedAt,
-    DateTimeOffset? CompletedAt);
+    DateTimeOffset? CompletedAt,
+    long ProcessingDurationSeconds,
+    long TotalDurationSeconds);
