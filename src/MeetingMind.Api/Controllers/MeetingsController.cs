@@ -1,4 +1,5 @@
 using MeetingMind.Application.Common.Exceptions;
+using MeetingMind.Application.Common.Failures;
 using MeetingMind.Application.Meetings;
 using Microsoft.AspNetCore.Mvc;
 
@@ -57,6 +58,7 @@ public class MeetingsController : ControllerBase
         {
             return BadRequest(new
             {
+                errorCode = MeetingErrorCodes.UploadValidation,
                 error = exception.Message
             });
         }
@@ -80,6 +82,7 @@ public class MeetingsController : ControllerBase
             status = result.Status,
             stage = result.Stage,
             progress = result.Progress,
+            errorCode = result.ErrorCode,
             errorMessage = result.ErrorMessage,
             automaticRetryCount = result.AutomaticRetryCount,
             automaticRetryLimit = result.AutomaticRetryLimit,
@@ -109,6 +112,7 @@ public class MeetingsController : ControllerBase
                 status = item.Status,
                 stage = item.Stage,
                 progress = item.Progress,
+                errorCode = item.ErrorCode,
                 errorMessage = item.ErrorMessage,
                 automaticRetryCount = item.AutomaticRetryCount,
                 automaticRetryLimit = item.AutomaticRetryLimit,

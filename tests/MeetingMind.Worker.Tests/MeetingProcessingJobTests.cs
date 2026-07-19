@@ -6,6 +6,7 @@ using MeetingMind.Domain.Entities;
 using MeetingMind.Domain.Enums;
 using MeetingMind.Infrastructure.Failures;
 using MeetingMind.Worker.Jobs;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace MeetingMind.Worker.Tests;
@@ -36,10 +37,11 @@ public sealed class MeetingProcessingJobTests
         var harness = new ProcessingHarness();
         harness.Minutes.Exception = new InvalidOperationException("unknown provider interruption");
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = await Assert.ThrowsAsync<MeetingProcessingAttemptException>(
             () => harness.Job.ProcessMeetingAsync(harness.Repository.Job.Id));
 
-        Assert.Equal("unknown provider interruption", exception.Message);
+        Assert.DoesNotContain("unknown provider interruption", exception.Message);
+        Assert.Equal("unexpected_failure", exception.ErrorCode);
         Assert.Equal(MeetingJobStatus.Queued, harness.Repository.Job.Status);
         Assert.Equal(MeetingJobStage.GeneratingMinutes, harness.Repository.Job.Stage);
         Assert.Equal(60, harness.Repository.Job.Progress);
@@ -47,6 +49,7 @@ public sealed class MeetingProcessingJobTests
         Assert.Equal(2, harness.Repository.Job.AutomaticRetryLimit);
         Assert.Equal(harness.Now.AddSeconds(10), harness.Repository.Job.NextRetryAt);
         Assert.Equal("Meeting processing failed temporarily and will be retried.", harness.Repository.Job.ErrorMessage);
+        Assert.Equal("unexpected_failure", harness.Repository.Job.ErrorCode);
 
         harness.Minutes.Exception = null;
         await harness.Job.ProcessMeetingAsync(harness.Repository.Job.Id);
@@ -86,7 +89,7 @@ public sealed class MeetingProcessingJobTests
         harness.Repository.Job.Status = MeetingJobStatus.Queued;
         harness.Audio.Exception = new InvalidOperationException("still unavailable");
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<MeetingProcessingAttemptException>(
             () => harness.Job.ProcessMeetingAsync(harness.Repository.Job.Id));
 
         Assert.Equal(MeetingJobStatus.Failed, harness.Repository.Job.Status);
@@ -147,13 +150,80 @@ public sealed class MeetingProcessingJobTests
         Assert.Equal("Test transcript", harness.Repository.Transcript.TranscriptText);
     }
 
+    [Fact]
+    public async Task LongMeetingProgressIsPersistedWithinGeneratingMinutesStage()
+    {
+        var harness = new ProcessingHarness();
+        harness.Minutes.ProgressUpdates = [68, 85, 87, 89];
+
+        await harness.Job.ProcessMeetingAsync(harness.Repository.Job.Id);
+
+        Assert.Equal(
+            [60, 68, 85, 87, 89],
+            harness.Repository.StatusUpdates
+                .Where(update => update.Stage == MeetingJobStage.GeneratingMinutes)
+                .Select(update => update.Progress));
+        Assert.Equal(MeetingJobStatus.Completed, harness.Repository.Job.Status);
+    }
+
+    [Fact]
+    public async Task PartialCallFailureSchedulesRetryAtLatestGenerationProgress()
+    {
+        var harness = new ProcessingHarness();
+        harness.Minutes.ProgressUpdates = [70];
+        harness.Minutes.Exception = new InvalidOperationException("partial provider interruption");
+
+        await Assert.ThrowsAsync<MeetingProcessingAttemptException>(() =>
+            harness.Job.ProcessMeetingAsync(harness.Repository.Job.Id));
+
+        Assert.Equal(MeetingJobStatus.Queued, harness.Repository.Job.Status);
+        Assert.Equal(MeetingJobStage.GeneratingMinutes, harness.Repository.Job.Stage);
+        Assert.Equal(70, harness.Repository.Job.Progress);
+        Assert.Equal(1, harness.Repository.Job.AutomaticRetryCount);
+    }
+
+    [Fact]
+    public async Task SuccessfulRunLogsStructuredStageOutcomesAndElapsedTime()
+    {
+        var harness = new ProcessingHarness();
+
+        await harness.Job.ProcessMeetingAsync(harness.Repository.Job.Id);
+
+        var logs = string.Join(Environment.NewLine, harness.Logger.Messages);
+        Assert.Contains("stage Validating; outcome Succeeded", logs);
+        Assert.Contains("stage Transcoding; outcome Succeeded", logs);
+        Assert.Contains("stage Transcribing; outcome Succeeded", logs);
+        Assert.Contains("stage GeneratingMinutes; outcome Succeeded", logs);
+        Assert.Contains("stage SavingResults; outcome Succeeded", logs);
+        Assert.Contains("stage Completed; outcome Succeeded", logs);
+        Assert.Contains("elapsed", logs);
+    }
+
+    [Fact]
+    public async Task FailureLogsAndThrownExceptionExcludeRawTechnicalDetail()
+    {
+        var harness = new ProcessingHarness();
+        const string sensitiveDetail = "C:\\private\\meeting.wav provider payload transcript fragment";
+        harness.Minutes.Exception = new InvalidOperationException(sensitiveDetail);
+
+        var exception = await Assert.ThrowsAsync<MeetingProcessingAttemptException>(() =>
+            harness.Job.ProcessMeetingAsync(harness.Repository.Job.Id));
+        var logs = string.Join(Environment.NewLine, harness.Logger.Messages);
+
+        Assert.DoesNotContain(sensitiveDetail, logs);
+        Assert.DoesNotContain(sensitiveDetail, exception.Message);
+        Assert.Contains("error code unexpected_failure", logs);
+        Assert.Contains("exception InvalidOperationException", logs);
+        Assert.All(harness.Logger.Exceptions, loggedException => Assert.Null(loggedException));
+    }
+
     private sealed class ProcessingHarness
     {
         public ProcessingHarness()
         {
             TimeProvider = new FixedTimeProvider(Now);
             Job = new MeetingProcessingJob(
-                NullLogger<MeetingProcessingJob>.Instance,
+                Logger,
                 Audio,
                 Storage,
                 Repository,
@@ -175,6 +245,8 @@ public sealed class MeetingProcessingJobTests
         public StubTranscriptionService Transcription { get; } = new();
 
         public StubMinutesService Minutes { get; } = new();
+
+        public CapturingLogger<MeetingProcessingJob> Logger { get; } = new();
 
         public AutomaticRetryOptions RetryOptions { get; } = new() { DelaysInSeconds = [10, 60] };
 
@@ -218,19 +290,32 @@ public sealed class MeetingProcessingJobTests
     {
         public Exception? Exception { get; set; }
 
+        public int[] ProgressUpdates { get; set; } = [];
+
         public int CallCount { get; private set; }
 
-        public Task<MeetingMinutesContent> GenerateMinutesAsync(
+        public async Task<MeetingMinutesContent> GenerateMinutesAsync(
             string transcriptText,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Func<MeetingMinutesGenerationProgress, CancellationToken, Task>? progressCallback = null)
         {
             CallCount++;
-            if (Exception is not null)
+            foreach (var percent in ProgressUpdates)
             {
-                return Task.FromException<MeetingMinutesContent>(Exception);
+                if (progressCallback is not null)
+                {
+                    await progressCallback(
+                        new MeetingMinutesGenerationProgress(percent, "test", percent, 100),
+                        cancellationToken);
+                }
             }
 
-            return Task.FromResult(new MeetingMinutesContent(
+            if (Exception is not null)
+            {
+                throw Exception;
+            }
+
+            return new MeetingMinutesContent(
                 "Test meeting",
                 "Test summary",
                 ["Hasham"],
@@ -238,7 +323,7 @@ public sealed class MeetingProcessingJobTests
                 ["Add coverage"],
                 [new MeetingActionItem("Write tests", "Hasham", null)],
                 ["Docker unavailable"],
-                ["Run tests"]));
+                ["Run tests"]);
         }
     }
 
@@ -273,6 +358,10 @@ public sealed class MeetingProcessingJobTests
         public Task<Stream> ReadAsync(string filePath, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
+        public void EnsurePathIsSafe(string filePath)
+        {
+        }
+
         public Task DeleteAsync(string filePath, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
     }
@@ -292,6 +381,8 @@ public sealed class MeetingProcessingJobTests
         public MeetingTranscript? Transcript { get; set; }
 
         public MeetingMinutes? SavedMinutes { get; private set; }
+
+        public List<StatusUpdate> StatusUpdates { get; } = [];
 
         public Task AddAsync(MeetingJob meetingJob, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
@@ -358,6 +449,7 @@ public sealed class MeetingProcessingJobTests
             Job.Status = MeetingJobStatus.Processing;
             Job.Stage = MeetingJobStage.Validating;
             Job.Progress = 0;
+            Job.ErrorCode = null;
             Job.ErrorMessage = null;
             Job.AutomaticRetryLimit = automaticRetryLimit;
             Job.NextRetryAt = null;
@@ -368,6 +460,7 @@ public sealed class MeetingProcessingJobTests
             Guid meetingJobId,
             MeetingJobStage stage,
             int progress,
+            string errorCode,
             string errorMessage,
             int automaticRetryCount,
             int automaticRetryLimit,
@@ -377,6 +470,7 @@ public sealed class MeetingProcessingJobTests
             Job.Status = MeetingJobStatus.Queued;
             Job.Stage = stage;
             Job.Progress = progress;
+            Job.ErrorCode = errorCode;
             Job.ErrorMessage = errorMessage;
             Job.AutomaticRetryCount = automaticRetryCount;
             Job.AutomaticRetryLimit = automaticRetryLimit;
@@ -388,6 +482,7 @@ public sealed class MeetingProcessingJobTests
             Guid meetingJobId,
             MeetingJobStage stage,
             int progress,
+            string errorCode,
             string errorMessage,
             int automaticRetryCount,
             int automaticRetryLimit,
@@ -396,6 +491,7 @@ public sealed class MeetingProcessingJobTests
             Job.Status = MeetingJobStatus.Failed;
             Job.Stage = stage;
             Job.Progress = progress;
+            Job.ErrorCode = errorCode;
             Job.ErrorMessage = errorMessage;
             Job.AutomaticRetryCount = automaticRetryCount;
             Job.AutomaticRetryLimit = automaticRetryLimit;
@@ -412,12 +508,38 @@ public sealed class MeetingProcessingJobTests
             string? errorMessage,
             CancellationToken cancellationToken)
         {
+            StatusUpdates.Add(new StatusUpdate(stage, progress));
             Job.Status = status;
             Job.Stage = stage;
             Job.Progress = progress;
+            Job.ErrorCode = errorMessage is null ? null : Job.ErrorCode;
             Job.ErrorMessage = errorMessage;
             Job.NextRetryAt = null;
             return Task.CompletedTask;
+        }
+
+        public sealed record StatusUpdate(MeetingJobStage Stage, int Progress);
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<string> Messages { get; } = [];
+
+        public List<Exception?> Exceptions { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(formatter(state, exception));
+            Exceptions.Add(exception);
         }
     }
 }

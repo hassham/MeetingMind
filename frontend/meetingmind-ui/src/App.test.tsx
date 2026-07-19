@@ -191,7 +191,7 @@ describe('MeetingMind workflow', () => {
     await user.click(retry)
 
     expect(await screen.findByText('Retry queued. Processing has restarted.')).toBeInTheDocument()
-    expect(screen.getByText('Uploaded')).toBeInTheDocument()
+    expect(screen.getAllByText('Uploaded')).toHaveLength(2)
   })
 
   it('shows an actionable retry error returned by the API', async () => {
@@ -272,6 +272,35 @@ describe('MeetingMind workflow', () => {
     expect((await screen.findAllByText('Transcribing')).length).toBeGreaterThan(0)
     expect(await screen.findByText('Sprint Planning', {}, { timeout: 7000 })).toBeInTheDocument()
     expect(statusRequests).toBeGreaterThanOrEqual(2)
+  })
+
+  it('keeps the selected history card synchronized with status polling', async () => {
+    server.use(
+      http.get('*/api/meetings/history', () =>
+        HttpResponse.json(historyResponse(historyItem('Queued', 'Uploaded', 0, 0, 5))),
+      ),
+      http.get('*/api/meetings/:id/status', () =>
+        HttpResponse.json({
+          jobId,
+          status: 'Processing',
+          stage: 'Validating',
+          progress: 0,
+          errorMessage: null,
+          processingDurationSeconds: 5,
+          totalDurationSeconds: 10,
+        }),
+      ),
+    )
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /planning\.mp3/i }))
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Processing')).toHaveLength(2)
+      expect(screen.getAllByText('Validating')).toHaveLength(2)
+      expect(screen.queryByText('Queued')).not.toBeInTheDocument()
+      expect(screen.queryByText('Uploaded')).not.toBeInTheDocument()
+    })
   })
 
   it('formats processing and total duration in history and selected details', async () => {

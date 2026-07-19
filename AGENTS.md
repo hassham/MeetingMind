@@ -75,9 +75,11 @@ and returns immediately.
   do not reintroduce synchronous chains here.
 - **Every infrastructure dependency is behind an interface**
   (`IFileStorageService`, `IAudioProcessingService`, `ITranscriptionService`,
-  `IMeetingMinutesService`, `IBackgroundJobService`). This is what makes the
-  cloud migration path (see SAD §14) possible later — don't bypass it for
-  convenience.
+  `IMeetingMinutesGenerationClient`, `IBackgroundJobService`).
+  `IMeetingMinutesService` is the Application-layer short/long transcript
+  orchestrator; Infrastructure implements only the single-call generation
+  client. This is what makes the cloud migration path (see SAD §14) possible
+  later — don't bypass it for convenience.
 - **No authentication in Phase 2.** All endpoints, including retry and the
   Hangfire dashboard, remain unauthenticated because Phase 2 is restricted to a
   trusted local deployment (see PRD §6, FSD §§1 and 7, SAD §12). Do not add auth
@@ -95,8 +97,8 @@ persistence directly for long-running work.
 
 The processing chain is decoupled as:
 `upload -> create MeetingJob -> enqueue Hangfire job -> FFmpeg -> local
-Whisper.net transcription -> OpenAI GPT meeting-minutes generation -> save
-results`.
+Whisper.net transcription -> Application minutes orchestration -> bounded
+OpenAI GPT generation/aggregation -> save results`.
 
 Phase 1 manual retry remains available for failed or cancelled jobs. P2-05 adds
 two configurable Hangfire retries (10 and 60 seconds by default) for classified
@@ -105,7 +107,7 @@ exhausted failures remain manually retryable with a fresh automatic budget.
 
 ## Data model (summary — see SAD §7 / FSD §5 for full field lists)
 
-- `MeetingJob` — Id, file paths, Status, Stage, Progress, ErrorMessage, timestamps
+- `MeetingJob` — Id, file paths, Status, Stage, Progress, ErrorCode, ErrorMessage, timestamps
 - `MeetingTranscript` — Id, MeetingJobId, TranscriptText, TranscriptFilePath
 - `MeetingMinutes` — Id, MeetingJobId, Title, Summary, DecisionsJson, ActionItemsJson, RisksJson, NextStepsJson, FullMinutesJson
 

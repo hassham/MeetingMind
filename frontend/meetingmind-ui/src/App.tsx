@@ -65,6 +65,25 @@ type HistoryResponse = {
   items: HistoryItem[]
 }
 
+function mergeStatusIntoHistoryItem(
+  item: HistoryItem,
+  status: JobStatusResponse,
+): HistoryItem {
+  if (item.jobId !== status.jobId) {
+    return item
+  }
+
+  return {
+    ...item,
+    status: status.status,
+    stage: status.stage,
+    progress: status.progress,
+    errorMessage: status.errorMessage,
+    processingDurationSeconds: status.processingDurationSeconds,
+    totalDurationSeconds: status.totalDurationSeconds,
+  }
+}
+
 type ActionItem = {
   description: string
   owner: string | null
@@ -191,6 +210,12 @@ function App() {
     async (jobId: string) => {
       const response = await axios.get<JobStatusResponse>(`/api/meetings/${jobId}/status`)
       setSelectedJob(response.data)
+      setHistory((current) =>
+        current.map((item) => mergeStatusIntoHistoryItem(item, response.data)),
+      )
+      setSelectedHistoryItem((current) =>
+        current ? mergeStatusIntoHistoryItem(current, response.data) : current,
+      )
       setLiveDurationOffsetSeconds(0)
 
       if (response.data.status === 'Completed') {

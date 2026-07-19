@@ -52,6 +52,7 @@ public class MeetingHistoryService : IMeetingHistoryService
             item.Status.ToString(),
             item.Stage.ToString(),
             item.Progress,
+            item.ErrorCode,
             item.ErrorMessage,
             item.AutomaticRetryCount,
             item.AutomaticRetryLimit,

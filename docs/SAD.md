@@ -165,15 +165,18 @@ Transcription does not use the OpenAI Whisper API.
 
 ### 4.8 Meeting-minutes generation
 
-`IMeetingMinutesService` isolates GPT generation. The current infrastructure
-implementation uses the OpenAI .NET SDK and strict JSON-schema output for title,
-summary, attendees, discussion points, decisions, action items, risks, and next
-steps.
+`IMeetingMinutesService` is the Application-layer orchestration boundary.
+`MeetingMinutesService` selects single-pass or long-transcript processing,
+splits bounded chunks, reports progress, performs deterministic merging, and
+coordinates hierarchical aggregation. `IMeetingMinutesGenerationClient` is the
+infrastructure boundary for individual provider calls; its OpenAI implementation
+uses the .NET SDK and strict JSON-schema output for all eight minutes sections.
 
-The Phase 1 implementation is single-pass and rejects transcripts over 120,000
-characters. P2-06 introduces Application-layer long-transcript orchestration so
-short transcripts remain single-pass and long transcripts use bounded partial
-generation and final aggregation.
+Transcripts up to 120,000 characters remain single-pass. Longer transcripts use
+sequential 60,000-character chunks with 1,500-character overlap and safe textual
+boundaries. Application code groups deterministically normalized partials under
+a 120,000-character aggregation-input limit and reduces them through bounded
+OpenAI tiers. The overall transcript maximum is 1,200,000 characters.
 
 ### 4.9 Background jobs
 
@@ -214,7 +217,9 @@ Hangfire Worker loads MeetingJob
   -> local Whisper.net transcription
   -> save transcript record and text file
   -> Processing / GeneratingMinutes / 60
-  -> short single-pass or Phase 2 long-transcript orchestration
+  -> short single-pass or bounded long-transcript orchestration
+       -> sequential structured partials / progress 60-85
+       -> deterministic merge and hierarchical aggregation / progress 86-89
   -> Processing / SavingResults / 90
   -> save minutes record and Markdown file
   -> Completed / Completed / 100
@@ -306,7 +311,7 @@ the job waits in configured backoff.
 ### MeetingJob
 
 `Id`, `OriginalFileName`, `OriginalFilePath`, `ProcessedFilePath`, `Status`,
-`Stage`, `Progress`, `ErrorMessage`, `HangfireJobId`, `AutomaticRetryCount`,
+`Stage`, `Progress`, `ErrorCode`, `ErrorMessage`, `HangfireJobId`, `AutomaticRetryCount`,
 `AutomaticRetryLimit`, `NextRetryAt`, `CreatedAt`, `StartedAt`, `CompletedAt`,
 and `UpdatedAt`.
 
@@ -337,6 +342,7 @@ repositories are added only for concrete use cases.
 | `POST` | `/api/meetings/{jobId}/retry` | Requeue failed or cancelled job |
 | `GET` | `/health` | API liveness |
 | `GET` | `/health/db` | Database health |
+| `GET` | `/health/ready` | Aggregate local dependency readiness |
 | `GET` | `/hangfire` | Unrestricted dashboard for trusted local use |
 
 Application result contracts form the boundary below controller response
@@ -367,30 +373,44 @@ Configuration areas:
 - `AudioProcessing`
 - `Transcription`
 - `OpenAI`
+- `MeetingMinutesGeneration`
 - `AutomaticRetry:DelaysInSeconds`
-- Phase 2 retention settings
+- `StorageRetention`
 
 The API and Worker inherit one required absolute `Storage__RootPath` environment
-variable, ensuring both resolve the same physical artifact root. The committed
-PostgreSQL connection string is a Docker-only local default and may be
-overridden through standard .NET configuration. Only the Worker requires an
-explicit existing FFmpeg path, Whisper configuration, and `OpenAI:ApiKey`.
+variable, ensuring both resolve the same physical artifact root. The API also
+loads the Worker FFmpeg and Whisper locations solely for readiness. The
+committed PostgreSQL connection string is a Docker-only local default and may
+be overridden through standard .NET configuration. Only the Worker strictly
+validates and uses FFmpeg, Whisper, and `OpenAI:ApiKey` for processing; absent
+dependency files make API readiness unhealthy.
 
 Startup performs shared validation before either host is built. Missing or
 invalid settings stop startup with a message naming the configuration key. The
 stub-processing delay was removed because the Worker executes the real pipeline.
 Automatic-retry delays are validated as a positive configured sequence; the
-sequence length is the retry limit. Retention configuration remains owned by
-P2-07.
+sequence length is the retry limit. Retention defaults to disabled, 30 days,
+daily at 02:00, and a 100-job batch, with a maximum batch size of 1000.
 
 ## 11. Observability and operations
 
-Current local observability consists of ASP.NET logs, Worker logs, the Hangfire
-dashboard, PostgreSQL job history, and stored job error state.
+Local observability consists of structured per-stage Worker events, ASP.NET
+logs, the Hangfire dashboard, PostgreSQL job history, stable safe error codes,
+and liveness/readiness endpoints. Routine processing logs identify job, stage,
+outcome, attempt, progress, error classification, exception type, and elapsed
+milliseconds. Raw exceptions, transcripts, provider payloads, secrets, and
+physical paths are excluded, including from Hangfire failure exceptions.
 
-P2-07 adds structured per-stage timing, safe error review, useful readiness
-checks, and bounded retention. Cleanup must verify root confinement and exclude
-active jobs before deleting any artifact.
+`/health/ready` queries PostgreSQL, creates/deletes a zero-byte probe below the
+storage root, verifies FFmpeg, and opens the configured Whisper model for read.
+It returns only named healthy/unhealthy states.
+
+When enabled, a daily Hangfire job invokes the Application retention service.
+It selects expired terminal jobs without scheduled retries in bounded batches.
+Infrastructure holds a PostgreSQL row lock while Application prevalidates and
+deletes all referenced artifacts and the repository cascades the job deletion.
+Missing in-root files are accepted; any unsafe or failed deletion retains the
+database record. Lexical root escape and reparse-point traversal are rejected.
 
 ## 12. Security architecture
 
@@ -500,7 +520,7 @@ public or shared deployment.
 | Risk | Current or planned mitigation |
 | --- | --- |
 | API becomes coupled to processing | Separate Worker and Application interfaces. |
-| Long input exceeds one GPT request | P2-06 chunking and hierarchical aggregation. |
+| Long input exceeds one GPT request | Bounded Application chunking and hierarchical aggregation. |
 | Provider retry conflicts with job state | P2-05 classified retries and state-transition tests. |
 | Machine-specific configuration | P2-03 portable defaults and validation. |
 | Local storage growth | P2-07 safe retention policy. |

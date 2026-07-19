@@ -18,6 +18,7 @@ public sealed class MeetingFailureClassifierTests
                 new InvalidOperationException("provider detail")));
 
         Assert.Equal(MeetingFailureKind.Permanent, result.Kind);
+        Assert.Equal(MeetingErrorCodes.InvalidInput, result.ErrorCode);
         Assert.DoesNotContain("provider detail", result.SafeMessage);
     }
 
@@ -52,6 +53,7 @@ public sealed class MeetingFailureClassifierTests
         var result = _classifier.Classify(new InvalidOperationException("unexpected defect detail"));
 
         Assert.Equal(MeetingFailureKind.Transient, result.Kind);
+        Assert.Equal(MeetingErrorCodes.UnexpectedFailure, result.ErrorCode);
         Assert.Equal("Meeting processing failed temporarily and will be retried.", result.SafeMessage);
     }
 

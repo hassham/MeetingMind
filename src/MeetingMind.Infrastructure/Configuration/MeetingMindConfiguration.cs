@@ -181,9 +181,39 @@ public static class MeetingMindConfiguration
         RequireText(options.ApiKey, "OpenAI:ApiKey", "is required");
         RequireText(options.Model, "OpenAI:Model", "is required");
 
-        if (options.MaxTranscriptCharactersForMinutes <= 0)
+        return options;
+    }
+
+    public static MeetingMinutesGenerationOptions ValidateMeetingMinutesGenerationOptions(
+        MeetingMinutesGenerationOptions options)
+    {
+        RequirePositive(options.SinglePassMaxCharacters, "MeetingMinutesGeneration:SinglePassMaxCharacters");
+        RequirePositive(options.ChunkSizeCharacters, "MeetingMinutesGeneration:ChunkSizeCharacters");
+        RequirePositive(options.MaxTranscriptCharacters, "MeetingMinutesGeneration:MaxTranscriptCharacters");
+        RequirePositive(
+            options.MaxAggregationInputCharacters,
+            "MeetingMinutesGeneration:MaxAggregationInputCharacters");
+
+        if (options.ChunkOverlapCharacters < 0 ||
+            options.ChunkOverlapCharacters >= options.ChunkSizeCharacters)
         {
-            throw Invalid("OpenAI:MaxTranscriptCharactersForMinutes", "must be greater than zero");
+            throw Invalid(
+                "MeetingMinutesGeneration:ChunkOverlapCharacters",
+                "must be non-negative and smaller than the chunk size");
+        }
+
+        if (options.ChunkSizeCharacters > options.SinglePassMaxCharacters)
+        {
+            throw Invalid(
+                "MeetingMinutesGeneration:ChunkSizeCharacters",
+                "must not exceed the single-pass limit");
+        }
+
+        if (options.MaxTranscriptCharacters < options.SinglePassMaxCharacters)
+        {
+            throw Invalid(
+                "MeetingMinutesGeneration:MaxTranscriptCharacters",
+                "must be greater than or equal to the single-pass limit");
         }
 
         return options;
@@ -212,6 +242,20 @@ public static class MeetingMindConfiguration
         return options;
     }
 
+    public static StorageRetentionOptions ValidateStorageRetentionOptions(StorageRetentionOptions options)
+    {
+        RequirePositive(options.RetentionDays, "StorageRetention:RetentionDays");
+        RequirePositive(options.BatchSize, "StorageRetention:BatchSize");
+        RequireText(options.Schedule, "StorageRetention:Schedule", "is required");
+
+        if (options.BatchSize > 1000)
+        {
+            throw Invalid("StorageRetention:BatchSize", "must not exceed 1000");
+        }
+
+        return options;
+    }
+
     private static void ValidateStorageFolder(string rootPath, string folder, string settingName)
     {
         RequireText(folder, settingName, "is required");
@@ -235,6 +279,14 @@ public static class MeetingMindConfiguration
         if (string.IsNullOrWhiteSpace(value))
         {
             throw Invalid(settingName, requirement);
+        }
+    }
+
+    private static void RequirePositive(int value, string settingName)
+    {
+        if (value <= 0)
+        {
+            throw Invalid(settingName, "must be greater than zero");
         }
     }
 

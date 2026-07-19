@@ -20,6 +20,8 @@ public class MeetingJob
 
     public string? ErrorMessage { get; set; }
 
+    public string? ErrorCode { get; set; }
+
     public string? HangfireJobId { get; set; }
 
     public int AutomaticRetryCount { get; set; }

@@ -6,5 +6,6 @@ public interface IMeetingMinutesService
 {
     Task<MeetingMinutesContent> GenerateMinutesAsync(
         string transcriptText,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        Func<MeetingMinutesGenerationProgress, CancellationToken, Task>? progressCallback = null);
 }

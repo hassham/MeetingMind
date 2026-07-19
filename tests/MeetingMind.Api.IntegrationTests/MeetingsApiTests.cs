@@ -33,6 +33,23 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
     }
 
     [Fact]
+    public async Task ReadinessReturnsNamedHealthyDependencyChecks()
+    {
+        await _factory.ResetAsync();
+
+        var response = await _factory.Client.GetAsync("/health/ready");
+        var json = await ReadJsonAsync(response);
+        var checks = json.RootElement.GetProperty("checks").EnumerateArray().ToArray();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Healthy", json.RootElement.GetProperty("status").GetString());
+        Assert.Equal(
+            ["database", "storage", "ffmpeg", "whisper_model"],
+            checks.Select(check => check.GetProperty("name").GetString()));
+        Assert.All(checks, check => Assert.Equal("Healthy", check.GetProperty("status").GetString()));
+    }
+
+    [Fact]
     public async Task UploadAcceptsSupportedAudioAndEnqueuesPersistedJob()
     {
         await _factory.ResetAsync();
@@ -62,6 +79,7 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
         var json = await ReadJsonAsync(response);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("upload_validation", json.RootElement.GetProperty("errorCode").GetString());
         Assert.Equal("Unsupported file extension.", json.RootElement.GetProperty("error").GetString());
         Assert.Empty(_factory.BackgroundJobs.EnqueuedJobIds);
     }
@@ -78,6 +96,8 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
         job.AutomaticRetryCount = 1;
         job.AutomaticRetryLimit = 2;
         job.NextRetryAt = now.AddSeconds(60);
+        job.ErrorCode = "temporary_interruption";
+        job.ErrorMessage = "A temporary interruption stopped processing.";
         await _factory.SeedAsync(job);
 
         var response = await _factory.Client.GetAsync($"/api/meetings/{job.Id}/status");
@@ -88,6 +108,7 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
         Assert.Equal("Processing", json.RootElement.GetProperty("status").GetString());
         Assert.Equal("Transcribing", json.RootElement.GetProperty("stage").GetString());
         Assert.Equal(25, json.RootElement.GetProperty("progress").GetInt32());
+        Assert.Equal("temporary_interruption", json.RootElement.GetProperty("errorCode").GetString());
         Assert.Equal(1, json.RootElement.GetProperty("automaticRetryCount").GetInt32());
         Assert.Equal(2, json.RootElement.GetProperty("automaticRetryLimit").GetInt32());
         Assert.Equal(

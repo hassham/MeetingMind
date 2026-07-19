@@ -30,6 +30,7 @@ public class MeetingStatusService : IMeetingStatusService
             meetingJob.Status.ToString(),
             meetingJob.Stage.ToString(),
             meetingJob.Progress,
+            meetingJob.ErrorCode,
             meetingJob.ErrorMessage,
             meetingJob.AutomaticRetryCount,
             meetingJob.AutomaticRetryLimit,

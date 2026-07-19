@@ -77,6 +77,10 @@ public sealed class TestFileStorageService : IFileStorageService
         return Task.CompletedTask;
     }
 
+    public void EnsurePathIsSafe(string filePath)
+    {
+    }
+
     public void AddText(string path, string content)
     {
         _files[path] = Encoding.UTF8.GetBytes(content);

@@ -1,6 +1,5 @@
-using MeetingMind.Infrastructure.Persistence;
+using MeetingMind.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace MeetingMind.Api.Controllers;
 
@@ -20,13 +19,40 @@ public class HealthController : ControllerBase
 
     [HttpGet("/health/db")]
     public async Task<IActionResult> GetDatabaseHealth(
-        MeetingMindDbContext dbContext,
+        IOperationalReadinessService readinessService,
         CancellationToken cancellationToken)
     {
-        var canConnect = await dbContext.Database.CanConnectAsync(cancellationToken);
+        var checks = await readinessService.CheckAsync(cancellationToken);
+        var database = checks.Single(check => check.Name == "database");
 
-        return canConnect
+        return database.IsHealthy
             ? Ok(new { status = "Healthy", database = "PostgreSQL" })
-            : Problem("Database connection failed");
+            : StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                status = "Unhealthy",
+                database = "PostgreSQL"
+            });
+    }
+
+    [HttpGet("/health/ready")]
+    public async Task<IActionResult> GetReadiness(
+        IOperationalReadinessService readinessService,
+        CancellationToken cancellationToken)
+    {
+        var checks = await readinessService.CheckAsync(cancellationToken);
+        var isHealthy = checks.All(check => check.IsHealthy);
+        var response = new
+        {
+            status = isHealthy ? "Healthy" : "Unhealthy",
+            checks = checks.Select(check => new
+            {
+                name = check.Name,
+                status = check.IsHealthy ? "Healthy" : "Unhealthy"
+            })
+        };
+
+        return isHealthy
+            ? Ok(response)
+            : StatusCode(StatusCodes.Status503ServiceUnavailable, response);
     }
 }

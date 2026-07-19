@@ -199,7 +199,8 @@ $storageRoot = (New-Item -ItemType Directory -Force -Path .\Storage).FullName
 $env:Storage__RootPath = $storageRoot
 ```
 
-Configure FFmpeg for the Worker with an absolute executable or folder path:
+Configure FFmpeg for the Worker and API readiness check with an absolute
+executable or folder path:
 
 ```powershell
 $ffmpegPath = "C:\path\to\ffmpeg.exe"
@@ -281,6 +282,7 @@ npm.cmd run dev
 | Frontend | `http://localhost:5173` |
 | Swagger UI | `http://localhost:5059/swagger` |
 | API health | `http://localhost:5059/health` |
+| API readiness | `http://localhost:5059/health/ready` |
 | Database health | `http://localhost:5059/health/db` |
 | Hangfire dashboard | `http://localhost:5059/hangfire` |
 
@@ -289,6 +291,7 @@ npm.cmd run dev
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | `GET` | `/health` | API health check |
+| `GET` | `/health/ready` | PostgreSQL, storage-write, FFmpeg, and Whisper-model readiness |
 | `GET` | `/health/db` | PostgreSQL health check |
 | `POST` | `/api/meetings/upload` | Upload audio and enqueue a job |
 | `GET` | `/api/meetings/{jobId}/status` | Read job status, progress, and duration |
@@ -337,6 +340,27 @@ processed audio; missing checkpoints fall back to the nearest safe earlier
 stage. Exhausted and permanent failures remain eligible for manual retry, which
 receives a fresh automatic-retry budget.
 
+## Long-meeting generation
+
+Transcripts up to 120,000 characters use one structured OpenAI request. Longer
+transcripts are normalized and split into sequential 60,000-character chunks
+with up to 1,500 characters of textual overlap. Boundaries prefer paragraphs,
+then sentences, whitespace, and finally a hard bounded cut. The configured
+overall maximum is 1,200,000 characters; larger transcripts fail safely and are
+never silently truncated.
+
+Every chunk produces the complete minutes schema. Application-layer
+orchestration normalizes and deterministically deduplicates partial results,
+then reduces bounded groups through one or more OpenAI aggregation tiers. Each
+aggregation input is limited to 120,000 serialized characters. All eight output
+sections are preserved, and action items with missing metadata are enriched
+without discarding genuinely conflicting variants.
+
+Long generation advances `GeneratingMinutes` progress from 60–85% during
+partial calls and 86–89% during aggregation. A transient call failure uses the
+P2-05 Hangfire policy; the retry reuses the persisted transcript and regenerates
+partials because temporary partial results are not persisted.
+
 ## Configuration
 
 Configuration is loaded through standard .NET configuration providers. Values
@@ -357,8 +381,16 @@ Common settings include:
 | Transcription language | `Transcription__Language` | `auto` |
 | OpenAI API key | `OpenAI__ApiKey` | Required by Worker; no committed default |
 | OpenAI model | `OpenAI__Model` | `gpt-4.1` |
-| Transcript character guard | `OpenAI__MaxTranscriptCharactersForMinutes` | `120000` |
+| Single-pass minutes limit | `MeetingMinutesGeneration__SinglePassMaxCharacters` | `120000` |
+| Minutes chunk size | `MeetingMinutesGeneration__ChunkSizeCharacters` | `60000` |
+| Minutes chunk overlap | `MeetingMinutesGeneration__ChunkOverlapCharacters` | `1500` |
+| Maximum transcript | `MeetingMinutesGeneration__MaxTranscriptCharacters` | `1200000` |
+| Maximum aggregation input | `MeetingMinutesGeneration__MaxAggregationInputCharacters` | `120000` |
 | Automatic retry delays | `AutomaticRetry__DelaysInSeconds__0`, `AutomaticRetry__DelaysInSeconds__1` | `10`, `60` seconds |
+| Retention enabled | `StorageRetention__Enabled` | `false` |
+| Terminal-job retention | `StorageRetention__RetentionDays` | `30` days |
+| Retention schedule | `StorageRetention__Schedule` | `0 2 * * *` (daily at 02:00) |
+| Retention batch size | `StorageRetention__BatchSize` | `100` jobs; maximum `1000` |
 
 The API and Worker must use the same `Storage__RootPath`. Configure it once as
 a user environment variable so both processes inherit the identical absolute
@@ -379,10 +411,12 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<connection-strin
   --project src\MeetingMind.Worker
 ```
 
-API startup validates the database, storage, and upload settings. Worker
-startup validates those settings plus FFmpeg, Whisper, and OpenAI settings.
-Missing or invalid required configuration stops startup and names the setting
-that must be corrected.
+API startup validates storage and upload settings and loads FFmpeg/Whisper
+locations for readiness. Worker startup strictly validates storage, FFmpeg,
+Whisper, OpenAI, retry, minutes-generation, and retention settings. Missing or
+invalid required Worker configuration stops startup and names the setting that
+must be corrected. `/health/ready` returns HTTP 503 until PostgreSQL and storage
+are usable and both the FFmpeg executable and Whisper model file exist.
 
 Never commit real API keys or other secrets. Use environment variables or .NET
 user secrets on the local machine.
@@ -396,10 +430,23 @@ Audio/Original/    Uploaded source files
 Audio/Processed/   Whisper-ready WAV files
 Transcript/        Transcript text files
 Minutes/           Generated Markdown minutes
+.health/           Temporary zero-byte readiness probes
 ```
 
 Stored paths are kept relative to the configured root, and local filesystem
 paths are not returned to the frontend.
+
+Retention cleanup is disabled by default. When enabled, the Worker registers a
+daily Hangfire cleanup. Only expired `Completed`, `Failed`, or `Cancelled` jobs
+without a scheduled retry are eligible. Cleanup locks and revalidates each job,
+prevalidates every path, deletes referenced artifacts, and then deletes the job;
+transcript and minutes rows cascade. Missing in-root files are harmless. Unsafe
+paths or other deletion failures keep the database record for a later retry.
+Rooted, escaping, symbolic-link, and junction paths are rejected.
+
+Status and history responses expose a stable `errorCode` and safe
+`errorMessage`. Worker and Hangfire failure records exclude raw exception
+messages, provider payloads, transcripts, secrets, and physical paths.
 
 ## Build and verification
 
@@ -471,6 +518,15 @@ docker compose logs meetingmind-postgres
 ```
 
 Then confirm the database migration has been applied.
+
+### Readiness returns HTTP 503
+
+Inspect the named checks returned by `/health/ready`. Confirm PostgreSQL is
+running, `Storage__RootPath` is writable, `AudioProcessing__FfmpegBinaryFolder`
+points to FFmpeg, and `Transcription__ModelPath` points to a readable model. If
+automatic model download is used, readiness remains unhealthy for
+`whisper_model` until the Worker has downloaded the configured model below the
+shared storage root.
 
 ## Shutting down
 

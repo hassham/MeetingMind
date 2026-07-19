@@ -7,7 +7,7 @@ Phase 2 decisions are preserved under
 
 Status legend: `TODO` | `IN PROGRESS` | `BLOCKED` | `PARTIAL` | `DONE`
 
-Last verified against code: 2026-07-18.
+Last verified against code: 2026-07-19.
 
 ## Current delivery cycle: Phase 2
 
@@ -91,8 +91,8 @@ Phase 2 is complete only when:
 
 ## Current focus
 
-P2-06 is next. It requires task-specific discovery before long-transcript
-chunking and hierarchical aggregation begin.
+P2-08 is next. It requires task-specific discovery before frontend experience
+changes begin.
 
 ## Ordered Phase 2 work packages
 
@@ -175,37 +175,37 @@ chunking and hierarchical aggregation begin.
 
 ### P2-06 - Support long meetings
 
-- [ ] Define configurable chunk size, overlap/boundary behaviour, maximum
+- [x] Define configurable chunk size, overlap/boundary behaviour, maximum
       supported input, and final aggregation limits.
-      Status: TODO.
-- [ ] Split long transcripts on safe textual boundaries and generate partial
+      Status: DONE. Completed: 2026-07-18.
+- [x] Split long transcripts on safe textual boundaries and generate partial
       structured summaries through Application-layer orchestration.
-      Status: TODO.
-- [ ] Aggregate partial results into final minutes while deduplicating and
+      Status: DONE. Completed: 2026-07-18.
+- [x] Aggregate partial results into final minutes while deduplicating and
       preserving attendees, discussion points, decisions, action items, risks,
       and next steps.
-      Status: TODO.
-- [ ] Define progress reporting and retry/failure behaviour for multi-call
+      Status: DONE. Completed: 2026-07-18.
+- [x] Define progress reporting and retry/failure behaviour for multi-call
       minutes generation.
-      Status: TODO.
-- [ ] Add boundary, aggregation, deduplication, failure, and regression tests
+      Status: DONE. Completed: 2026-07-18.
+- [x] Add boundary, aggregation, deduplication, failure, and regression tests
       for both short and long transcripts.
-      Status: TODO.
+      Status: DONE. Completed: 2026-07-18.
 
 ### P2-07 - Operational hardening
 
-- [ ] Add structured per-stage logs and timing without logging full transcripts,
+- [x] Add structured per-stage logs and timing without logging full transcripts,
       local paths, secrets, or sensitive AI payloads.
-      Status: TODO.
-- [ ] Add useful health/readiness checks for the database and locally verifiable
+      Status: DONE. Completed: 2026-07-19.
+- [x] Add useful health/readiness checks for the database and locally verifiable
       dependencies such as storage, FFmpeg, and Whisper model configuration.
-      Status: TODO.
-- [ ] Define and implement a configurable storage-retention and cleanup policy
+      Status: DONE. Completed: 2026-07-19.
+- [x] Define and implement a configurable storage-retention and cleanup policy
       that cannot delete active jobs or escape the configured storage root.
-      Status: TODO.
-- [ ] Review user-facing versus technical errors and keep exposed messages safe
+      Status: DONE. Completed: 2026-07-19.
+- [x] Review user-facing versus technical errors and keep exposed messages safe
       and actionable.
-      Status: TODO.
+      Status: DONE. Completed: 2026-07-19.
 
 ### P2-08 - Complete the local frontend experience
 

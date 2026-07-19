@@ -21,7 +21,9 @@ public sealed class MeetingFailureClassifier : IMeetingFailureClassifier
 
         if (exceptions.OfType<PermanentMeetingProcessingException>().Any())
         {
-            return Permanent("Meeting processing cannot continue without correcting its input or configuration.");
+            return Permanent(
+                MeetingErrorCodes.InvalidInput,
+                "Meeting processing cannot continue without correcting its input or configuration.");
         }
 
         var clientException = exceptions.OfType<ClientResultException>().FirstOrDefault();
@@ -30,12 +32,12 @@ public sealed class MeetingFailureClassifier : IMeetingFailureClassifier
             if (IsNonRetryableQuotaFailure(clientException) ||
                 clientException.Status is >= 400 and < 500 and not 408 and not 409 and not 429)
             {
-                return Permanent("The meeting-minutes provider rejected the request.");
+                return Permanent(MeetingErrorCodes.ProviderRejected, "The meeting-minutes provider rejected the request.");
             }
 
             if (clientException.Status is 408 or 409 or 429 || clientException.Status >= 500)
             {
-                return Transient("The meeting-minutes provider is temporarily unavailable.");
+                return Transient(MeetingErrorCodes.ProviderUnavailable, "The meeting-minutes provider is temporarily unavailable.");
             }
         }
 
@@ -43,38 +45,38 @@ public sealed class MeetingFailureClassifier : IMeetingFailureClassifier
         if (databaseException is not null)
         {
             return databaseException.IsTransient
-                ? Transient("Meeting data storage is temporarily unavailable.")
-                : Permanent("Meeting data could not be saved because of a permanent database error.");
+                ? Transient(MeetingErrorCodes.DatabaseUnavailable, "Meeting data storage is temporarily unavailable.")
+                : Permanent(MeetingErrorCodes.DatabaseFailure, "Meeting data could not be saved because of a permanent database error.");
         }
 
         if (exceptions.OfType<DbUpdateException>().Any())
         {
-            return Permanent("Meeting data could not be saved because it was invalid or conflicted with existing data.");
+            return Permanent(MeetingErrorCodes.DatabaseFailure, "Meeting data could not be saved because it was invalid or conflicted with existing data.");
         }
 
         if (exceptions.Any(current => current is FileNotFoundException or DirectoryNotFoundException))
         {
-            return Permanent("A required meeting-processing file was not found.");
+            return Permanent(MeetingErrorCodes.RequiredResourceMissing, "A required meeting-processing file was not found.");
         }
 
         if (exceptions.Any(current => current is UnauthorizedAccessException or PathTooLongException))
         {
-            return Permanent("Meeting processing cannot access a required local resource.");
+            return Permanent(MeetingErrorCodes.ResourceAccessDenied, "Meeting processing cannot access a required local resource.");
         }
 
         if (exceptions.OfType<IOException>().Any(io => io.HResult is ErrorDiskFull or ErrorHandleDiskFull))
         {
-            return Permanent("Local storage does not have enough available space.");
+            return Permanent(MeetingErrorCodes.StorageFull, "Local storage does not have enough available space.");
         }
 
         if (exceptions.Any(current => current is TimeoutException or HttpRequestException or OperationCanceledException))
         {
-            return Transient("A temporary timeout or network interruption stopped meeting processing.");
+            return Transient(MeetingErrorCodes.TemporaryInterruption, "A temporary timeout or network interruption stopped meeting processing.");
         }
 
         if (exceptions.OfType<IOException>().Any())
         {
-            return Transient("Local storage is temporarily unavailable.");
+            return Transient(MeetingErrorCodes.StorageUnavailable, "Local storage is temporarily unavailable.");
         }
 
         if (exceptions.Any(current => current is FFMpegArgumentException or
@@ -83,20 +85,20 @@ public sealed class MeetingFailureClassifier : IMeetingFailureClassifier
                                       FormatNullException or
                                       FFMpegException))
         {
-            return Permanent("The uploaded audio could not be processed by FFmpeg.");
+            return Permanent(MeetingErrorCodes.UnsupportedMedia, "The uploaded audio could not be processed by FFmpeg.");
         }
 
         if (exceptions.Any(current => current is ArgumentException or NotSupportedException))
         {
-            return Permanent("Meeting processing received unsupported or invalid input.");
+            return Permanent(MeetingErrorCodes.InvalidInput, "Meeting processing received unsupported or invalid input.");
         }
 
         if (exceptions.OfType<JsonException>().Any())
         {
-            return Permanent("The meeting-minutes provider returned an invalid structured response.");
+            return Permanent(MeetingErrorCodes.InvalidProviderResponse, "The meeting-minutes provider returned an invalid structured response.");
         }
 
-        return Transient("Meeting processing failed temporarily and will be retried.");
+        return Transient(MeetingErrorCodes.UnexpectedFailure, "Meeting processing failed temporarily and will be retried.");
     }
 
     private static IEnumerable<Exception> Enumerate(Exception exception)
@@ -114,9 +116,9 @@ public sealed class MeetingFailureClassifier : IMeetingFailureClassifier
                 exception.Message.Contains("billing", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static MeetingFailureClassification Transient(string message) =>
-        new(MeetingFailureKind.Transient, message);
+    private static MeetingFailureClassification Transient(string errorCode, string message) =>
+        new(MeetingFailureKind.Transient, errorCode, message);
 
-    private static MeetingFailureClassification Permanent(string message) =>
-        new(MeetingFailureKind.Permanent, message);
+    private static MeetingFailureClassification Permanent(string errorCode, string message) =>
+        new(MeetingFailureKind.Permanent, errorCode, message);
 }

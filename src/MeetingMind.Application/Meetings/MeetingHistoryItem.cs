@@ -6,6 +6,7 @@ public sealed record MeetingHistoryItem(
     string Status,
     string Stage,
     int Progress,
+    string? ErrorCode,
     string? ErrorMessage,
     int AutomaticRetryCount,
     int AutomaticRetryLimit,

@@ -133,6 +133,7 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
         Assert.Equal(MeetingJobStage.Uploaded, reset.Stage);
         Assert.Equal(0, reset.Progress);
         Assert.Null(reset.ErrorMessage);
+        Assert.Null(reset.ErrorCode);
         Assert.Null(reset.HangfireJobId);
         Assert.Equal(0, reset.AutomaticRetryCount);
         Assert.Equal(0, reset.AutomaticRetryLimit);
@@ -170,6 +171,7 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
             job.Id,
             MeetingJobStage.Transcribing,
             25,
+            "temporary_interruption",
             "Temporary transcription failure.",
             1,
             2,
@@ -180,6 +182,7 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
         Assert.NotNull(scheduled);
         Assert.Equal(MeetingJobStatus.Queued, scheduled.Status);
         Assert.Equal(MeetingJobStage.Transcribing, scheduled.Stage);
+        Assert.Equal("temporary_interruption", scheduled.ErrorCode);
         Assert.Equal(1, scheduled.AutomaticRetryCount);
         Assert.Equal(2, scheduled.AutomaticRetryLimit);
         Assert.Equal(nextRetryAt.ToUnixTimeSeconds(), scheduled.NextRetryAt?.ToUnixTimeSeconds());
@@ -197,6 +200,7 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
             job.Id,
             MeetingJobStage.Transcribing,
             25,
+            "retry_exhausted",
             "Retries exhausted.",
             2,
             2,
@@ -205,6 +209,7 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
         var failed = await repository.GetByIdAsync(job.Id, CancellationToken.None);
         Assert.NotNull(failed);
         Assert.Equal(MeetingJobStatus.Failed, failed.Status);
+        Assert.Equal("retry_exhausted", failed.ErrorCode);
         Assert.Equal(2, failed.AutomaticRetryCount);
         Assert.Null(failed.NextRetryAt);
         Assert.NotNull(failed.CompletedAt);
@@ -229,6 +234,46 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
 
         Assert.Contains(missingJobId.ToString(), exception.Message);
         Assert.Equal(0, await repository.CountAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task RetentionRepositorySelectsOnlyExpiredTerminalJobsAndRevalidatesDeletion()
+    {
+        await _fixture.ResetAsync();
+        await using var dbContext = _fixture.CreateDbContext();
+        var repository = new EfStorageRetentionRepository(dbContext);
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-30);
+        var expired = CreateJob("expired.mp3", cutoff.AddDays(-1));
+        expired.Status = MeetingJobStatus.Completed;
+        expired.CompletedAt = cutoff.AddDays(-1);
+        var active = CreateJob("active.mp3", cutoff.AddDays(-2));
+        active.Status = MeetingJobStatus.Processing;
+        active.UpdatedAt = cutoff.AddDays(-2);
+        var scheduledRetry = CreateJob("retry.mp3", cutoff.AddDays(-2));
+        scheduledRetry.Status = MeetingJobStatus.Failed;
+        scheduledRetry.CompletedAt = cutoff.AddDays(-2);
+        scheduledRetry.NextRetryAt = DateTimeOffset.UtcNow.AddMinutes(1);
+        dbContext.AddRange(expired, active, scheduledRetry);
+        await dbContext.SaveChangesAsync();
+
+        var ids = await repository.GetExpiredTerminalJobIdsAsync(cutoff, 100, CancellationToken.None);
+        var activeDeleted = await repository.DeleteEligibleJobWithArtifactsAsync(
+            active.Id,
+            cutoff,
+            (_, _) => Task.CompletedTask,
+            CancellationToken.None);
+        var deleted = await repository.DeleteEligibleJobWithArtifactsAsync(
+            expired.Id,
+            cutoff,
+            (_, _) => Task.CompletedTask,
+            CancellationToken.None);
+
+        Assert.Equal([expired.Id], ids);
+        Assert.False(activeDeleted);
+        Assert.True(deleted);
+        Assert.NotNull(await dbContext.MeetingJobs.FindAsync(active.Id));
+        Assert.NotNull(await dbContext.MeetingJobs.FindAsync(scheduledRetry.Id));
+        Assert.Null(await dbContext.MeetingJobs.FindAsync(expired.Id));
     }
 
     private static MeetingJob CreateJob(string fileName, DateTimeOffset? createdAt = null)

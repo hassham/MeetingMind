@@ -18,6 +18,10 @@ public sealed class MeetingMindApiFactory : WebApplicationFactory<Program>, IAsy
         .Build();
 
     private string _connectionString = string.Empty;
+    private readonly string _dependencyRoot = Path.Combine(
+        Path.GetTempPath(),
+        "MeetingMind.Api.Dependencies",
+        Guid.NewGuid().ToString("N"));
 
     public TestBackgroundJobService BackgroundJobs { get; } = new();
 
@@ -55,6 +59,10 @@ public sealed class MeetingMindApiFactory : WebApplicationFactory<Program>, IAsy
         Client.Dispose();
         Dispose();
         await _container.DisposeAsync();
+        if (Directory.Exists(_dependencyRoot))
+        {
+            Directory.Delete(_dependencyRoot, recursive: true);
+        }
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -64,6 +72,13 @@ public sealed class MeetingMindApiFactory : WebApplicationFactory<Program>, IAsy
         builder.UseSetting(
             "Storage:RootPath",
             Path.Combine(Path.GetTempPath(), "MeetingMind.Api.IntegrationTests"));
+        Directory.CreateDirectory(_dependencyRoot);
+        var ffmpegPath = Path.Combine(_dependencyRoot, "ffmpeg.exe");
+        var modelPath = Path.Combine(_dependencyRoot, "whisper-model.bin");
+        File.WriteAllBytes(ffmpegPath, [0]);
+        File.WriteAllBytes(modelPath, [0]);
+        builder.UseSetting("AudioProcessing:FfmpegBinaryFolder", ffmpegPath);
+        builder.UseSetting("Transcription:ModelPath", modelPath);
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IBackgroundJobService>();

@@ -7,6 +7,7 @@ using MeetingMind.Application.Meetings;
 using MeetingMind.Infrastructure.BackgroundJobs;
 using MeetingMind.Infrastructure.Configuration;
 using MeetingMind.Infrastructure.Persistence;
+using MeetingMind.Infrastructure.Operations;
 using MeetingMind.Infrastructure.Storage;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,16 @@ var connectionString = MeetingMindConfiguration.GetConnectionString(builder.Conf
 var storageOptions = MeetingMindConfiguration.ValidateStorageOptions(
     builder.Configuration.GetSection("Storage").Get<StorageOptions>() ?? new StorageOptions());
 builder.Services.AddSingleton(storageOptions);
+
+var audioProcessingOptions = builder.Configuration
+    .GetSection("AudioProcessing")
+    .Get<AudioProcessingOptions>() ?? new AudioProcessingOptions();
+builder.Services.AddSingleton(audioProcessingOptions);
+
+var transcriptionOptions = builder.Configuration
+    .GetSection("Transcription")
+    .Get<TranscriptionOptions>() ?? new TranscriptionOptions();
+builder.Services.AddSingleton(transcriptionOptions);
 
 builder.Services.Configure<FormOptions>(options =>
 {
@@ -49,6 +60,7 @@ builder.Services.AddHangfire(configuration =>
 });
 
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
+builder.Services.AddScoped<IOperationalReadinessService, OperationalReadinessService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IBackgroundJobService, HangfireBackgroundJobService>();
 builder.Services.AddScoped<IMeetingJobRepository, EfMeetingJobRepository>();

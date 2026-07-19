@@ -12,5 +12,7 @@ public interface IFileStorageService
 
     Task<Stream> ReadAsync(string filePath, CancellationToken cancellationToken);
 
+    void EnsurePathIsSafe(string filePath);
+
     Task DeleteAsync(string filePath, CancellationToken cancellationToken);
 }

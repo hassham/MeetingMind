@@ -47,9 +47,11 @@ public class MeetingProcessingJob : IMeetingProcessingJob
 
     public async Task ProcessMeetingAsync(Guid jobId)
     {
-        _logger.LogInformation("Meeting processing started for job {JobId}", jobId);
+        var attemptStarted = _timeProvider.GetTimestamp();
+        var stageStarted = attemptStarted;
         var currentStage = MeetingJobStage.Validating;
         var currentProgress = 0;
+        var attemptNumber = 1;
         MeetingJob? meetingJob = null;
 
         try
@@ -57,14 +59,38 @@ public class MeetingProcessingJob : IMeetingProcessingJob
             meetingJob = await _meetingJobRepository.GetByIdAsync(jobId, CancellationToken.None);
             if (meetingJob is null)
             {
-                _logger.LogWarning("Meeting processing skipped because job {JobId} was not found", jobId);
+                _logger.LogWarning(
+                    "Meeting processing event for job {JobId}; stage {Stage}; outcome {Outcome}; elapsed {ElapsedMilliseconds} ms",
+                    jobId,
+                    currentStage,
+                    "NotFound",
+                    GetElapsedMilliseconds(attemptStarted));
                 return;
             }
+
+            attemptNumber = meetingJob.AutomaticRetryCount + 1;
+            LogStageOutcome(
+                LogLevel.Information,
+                jobId,
+                currentStage,
+                "Started",
+                currentProgress,
+                attemptNumber,
+                attemptStarted);
 
             await _meetingJobRepository.BeginProcessingAsync(
                 jobId,
                 _retryOptions.RetryLimit,
                 CancellationToken.None);
+
+            LogStageOutcome(
+                LogLevel.Information,
+                jobId,
+                MeetingJobStage.Validating,
+                "Succeeded",
+                currentProgress,
+                attemptNumber,
+                stageStarted);
 
             var transcript = await GetValidTranscriptCheckpointAsync(jobId);
             string transcriptText;
@@ -72,20 +98,27 @@ public class MeetingProcessingJob : IMeetingProcessingJob
             if (transcript is not null)
             {
                 transcriptText = transcript.TranscriptText;
-                _logger.LogInformation(
-                    "Meeting processing resumed from transcript checkpoint for job {JobId}",
-                    jobId);
+                LogStageOutcome(
+                    LogLevel.Information,
+                    jobId,
+                    MeetingJobStage.Transcribing,
+                    "CheckpointReused",
+                    60,
+                    attemptNumber,
+                    _timeProvider.GetTimestamp());
             }
             else
             {
                 var processedFilePath = await GetOrCreateProcessedAudioAsync(
                     meetingJob,
                     jobId,
+                    attemptNumber,
                     stage => currentStage = stage,
                     progress => currentProgress = progress);
 
                 currentStage = MeetingJobStage.Transcribing;
                 currentProgress = 25;
+                stageStarted = _timeProvider.GetTimestamp();
                 await _meetingJobRepository.UpdateStatusAsync(
                     jobId,
                     MeetingJobStatus.Processing,
@@ -109,13 +142,19 @@ public class MeetingProcessingJob : IMeetingProcessingJob
                     transcriptFilePath,
                     CancellationToken.None);
 
-                _logger.LogInformation(
-                    "Transcription completed for job {JobId}; transcript checkpoint saved",
-                    jobId);
+                LogStageOutcome(
+                    LogLevel.Information,
+                    jobId,
+                    currentStage,
+                    "Succeeded",
+                    60,
+                    attemptNumber,
+                    stageStarted);
             }
 
             currentStage = MeetingJobStage.GeneratingMinutes;
             currentProgress = 60;
+            stageStarted = _timeProvider.GetTimestamp();
             await _meetingJobRepository.UpdateStatusAsync(
                 jobId,
                 MeetingJobStatus.Processing,
@@ -126,16 +165,41 @@ public class MeetingProcessingJob : IMeetingProcessingJob
 
             var generatedMinutes = await _meetingMinutesService.GenerateMinutesAsync(
                 transcriptText,
-                CancellationToken.None);
+                CancellationToken.None,
+                async (progress, cancellationToken) =>
+                {
+                    currentProgress = progress.Percent;
+                    await _meetingJobRepository.UpdateStatusAsync(
+                        jobId,
+                        MeetingJobStatus.Processing,
+                        MeetingJobStage.GeneratingMinutes,
+                        progress.Percent,
+                        errorMessage: null,
+                        cancellationToken);
+
+                    _logger.LogDebug(
+                        "Meeting processing progress for job {JobId}; stage {Stage}; phase {Phase}; completed {Completed}; total {Total}; progress {Progress}",
+                        jobId,
+                        MeetingJobStage.GeneratingMinutes,
+                        progress.Phase,
+                        progress.Completed,
+                        progress.Total,
+                        progress.Percent);
+                });
+
+            LogStageOutcome(
+                LogLevel.Information,
+                jobId,
+                currentStage,
+                "Succeeded",
+                89,
+                attemptNumber,
+                stageStarted);
 
             var minutesMarkdown = MeetingMinutesFormatter.ToMarkdown(generatedMinutes);
-            var minutesFilePath = await _fileStorageService.SaveMinutesAsync(
-                jobId,
-                minutesMarkdown,
-                CancellationToken.None);
-
             currentStage = MeetingJobStage.SavingResults;
             currentProgress = 90;
+            stageStarted = _timeProvider.GetTimestamp();
             await _meetingJobRepository.UpdateStatusAsync(
                 jobId,
                 MeetingJobStatus.Processing,
@@ -144,10 +208,24 @@ public class MeetingProcessingJob : IMeetingProcessingJob
                 errorMessage: null,
                 CancellationToken.None);
 
+            var minutesFilePath = await _fileStorageService.SaveMinutesAsync(
+                jobId,
+                minutesMarkdown,
+                CancellationToken.None);
+
             await _meetingJobRepository.SaveMinutesAsync(
                 jobId,
                 CreateMeetingMinutes(jobId, generatedMinutes, minutesFilePath),
                 CancellationToken.None);
+
+            LogStageOutcome(
+                LogLevel.Information,
+                jobId,
+                currentStage,
+                "Succeeded",
+                currentProgress,
+                attemptNumber,
+                stageStarted);
 
             await _meetingJobRepository.UpdateStatusAsync(
                 jobId,
@@ -157,38 +235,60 @@ public class MeetingProcessingJob : IMeetingProcessingJob
                 errorMessage: null,
                 CancellationToken.None);
 
-            _logger.LogInformation(
-                "Meeting processing completed for job {JobId} after {AutomaticRetryCount} automatic retries",
+            LogStageOutcome(
+                LogLevel.Information,
                 jobId,
-                meetingJob.AutomaticRetryCount);
+                MeetingJobStage.Completed,
+                "Succeeded",
+                100,
+                attemptNumber,
+                attemptStarted);
         }
         catch (Exception exception)
         {
-            _logger.LogError(
-                exception,
-                "Meeting processing attempt failed for job {JobId} at stage {Stage}",
-                jobId,
-                currentStage);
-
+            var classification = _failureClassifier.Classify(exception);
             if (meetingJob is null)
             {
-                throw;
-            }
-
-            var classification = _failureClassifier.Classify(exception);
-            if (classification.Kind == MeetingFailureKind.Permanent)
-            {
-                await _meetingJobRepository.RecordFinalFailureAsync(
+                _logger.LogError(
+                    "Meeting processing event for job {JobId}; stage {Stage}; outcome {Outcome}; error code {ErrorCode}; classification {FailureKind}; exception {ExceptionType}; elapsed {ElapsedMilliseconds} ms",
                     jobId,
                     currentStage,
-                    currentProgress,
-                    classification.SafeMessage,
-                    meetingJob.AutomaticRetryCount,
-                    _retryOptions.RetryLimit,
-                    CancellationToken.None);
+                    "FailedBeforeLoad",
+                    classification.ErrorCode,
+                    classification.Kind,
+                    exception.GetType().Name,
+                    GetElapsedMilliseconds(stageStarted));
+                throw CreateSafeException(classification);
+            }
 
-                throw exception as PermanentMeetingProcessingException ??
-                      new PermanentMeetingProcessingException(classification.SafeMessage, exception);
+            _logger.LogError(
+                "Meeting processing event for job {JobId}; stage {Stage}; outcome {Outcome}; attempt {Attempt}; progress {Progress}; error code {ErrorCode}; classification {FailureKind}; exception {ExceptionType}; elapsed {ElapsedMilliseconds} ms",
+                jobId,
+                currentStage,
+                classification.Kind == MeetingFailureKind.Permanent ? "Failed" : "AttemptFailed",
+                attemptNumber,
+                currentProgress,
+                classification.ErrorCode,
+                classification.Kind,
+                exception.GetType().Name,
+                GetElapsedMilliseconds(stageStarted));
+            if (classification.Kind == MeetingFailureKind.Permanent)
+            {
+                await PersistFailureStateAsync(
+                    () => _meetingJobRepository.RecordFinalFailureAsync(
+                        jobId,
+                        currentStage,
+                        currentProgress,
+                        classification.ErrorCode,
+                        classification.SafeMessage,
+                        meetingJob.AutomaticRetryCount,
+                        _retryOptions.RetryLimit,
+                        CancellationToken.None),
+                    jobId,
+                    currentStage,
+                    stageStarted);
+
+                throw CreateSafeException(classification);
             }
 
             if (meetingJob.AutomaticRetryCount < _retryOptions.RetryLimit)
@@ -198,36 +298,52 @@ public class MeetingProcessingJob : IMeetingProcessingJob
                     _retryOptions.DelaysInSeconds[meetingJob.AutomaticRetryCount]);
                 var nextRetryAt = _timeProvider.GetUtcNow().Add(delay);
 
-                await _meetingJobRepository.ScheduleAutomaticRetryAsync(
+                await PersistFailureStateAsync(
+                    () => _meetingJobRepository.ScheduleAutomaticRetryAsync(
+                        jobId,
+                        currentStage,
+                        currentProgress,
+                        classification.ErrorCode,
+                        classification.SafeMessage,
+                        nextRetryCount,
+                        _retryOptions.RetryLimit,
+                        nextRetryAt,
+                        CancellationToken.None),
                     jobId,
                     currentStage,
+                    stageStarted);
+
+                _logger.LogWarning(
+                    "Meeting processing event for job {JobId}; stage {Stage}; outcome {Outcome}; attempt {Attempt}; progress {Progress}; error code {ErrorCode}; retry {AutomaticRetryCount} of {AutomaticRetryLimit}; next retry {NextRetryAt}; elapsed {ElapsedMilliseconds} ms",
+                    jobId,
+                    currentStage,
+                    "RetryScheduled",
+                    attemptNumber,
                     currentProgress,
-                    classification.SafeMessage,
+                    classification.ErrorCode,
                     nextRetryCount,
                     _retryOptions.RetryLimit,
                     nextRetryAt,
-                    CancellationToken.None);
+                    GetElapsedMilliseconds(stageStarted));
 
-                _logger.LogWarning(
-                    "Automatic retry {AutomaticRetryCount} of {AutomaticRetryLimit} scheduled for job {JobId} at {NextRetryAt}",
-                    nextRetryCount,
-                    _retryOptions.RetryLimit,
-                    jobId,
-                    nextRetryAt);
-
-                throw;
+                throw CreateSafeException(classification);
             }
 
-            await _meetingJobRepository.RecordFinalFailureAsync(
+            await PersistFailureStateAsync(
+                () => _meetingJobRepository.RecordFinalFailureAsync(
+                    jobId,
+                    currentStage,
+                    currentProgress,
+                    classification.ErrorCode,
+                    classification.SafeMessage,
+                    meetingJob.AutomaticRetryCount,
+                    _retryOptions.RetryLimit,
+                    CancellationToken.None),
                 jobId,
                 currentStage,
-                currentProgress,
-                classification.SafeMessage,
-                meetingJob.AutomaticRetryCount,
-                _retryOptions.RetryLimit,
-                CancellationToken.None);
+                stageStarted);
 
-            throw;
+            throw CreateSafeException(classification);
         }
     }
 
@@ -254,6 +370,7 @@ public class MeetingProcessingJob : IMeetingProcessingJob
     private async Task<string> GetOrCreateProcessedAudioAsync(
         MeetingJob meetingJob,
         Guid jobId,
+        int attemptNumber,
         Action<MeetingJobStage> setStage,
         Action<int> setProgress)
     {
@@ -262,12 +379,18 @@ public class MeetingProcessingJob : IMeetingProcessingJob
                 meetingJob.ProcessedFilePath,
                 CancellationToken.None))
         {
-            _logger.LogInformation(
-                "Meeting processing resumed from processed-audio checkpoint for job {JobId}",
-                jobId);
+            LogStageOutcome(
+                LogLevel.Information,
+                jobId,
+                MeetingJobStage.Transcoding,
+                "CheckpointReused",
+                25,
+                attemptNumber,
+                _timeProvider.GetTimestamp());
             return meetingJob.ProcessedFilePath;
         }
 
+        var stageStarted = _timeProvider.GetTimestamp();
         setStage(MeetingJobStage.Transcoding);
         setProgress(10);
         await _meetingJobRepository.UpdateStatusAsync(
@@ -287,11 +410,77 @@ public class MeetingProcessingJob : IMeetingProcessingJob
             processedFilePath,
             CancellationToken.None);
 
-        _logger.LogInformation(
-            "Audio processing completed for job {JobId}; processed-audio checkpoint saved",
-            jobId);
+        LogStageOutcome(
+            LogLevel.Information,
+            jobId,
+            MeetingJobStage.Transcoding,
+            "Succeeded",
+            25,
+            attemptNumber,
+            stageStarted);
 
         return processedFilePath;
+    }
+
+    private void LogStageOutcome(
+        LogLevel logLevel,
+        Guid jobId,
+        MeetingJobStage stage,
+        string outcome,
+        int progress,
+        int attempt,
+        long startedTimestamp)
+    {
+        _logger.Log(
+            logLevel,
+            "Meeting processing event for job {JobId}; stage {Stage}; outcome {Outcome}; attempt {Attempt}; progress {Progress}; elapsed {ElapsedMilliseconds} ms",
+            jobId,
+            stage,
+            outcome,
+            attempt,
+            progress,
+            GetElapsedMilliseconds(startedTimestamp));
+    }
+
+    private long GetElapsedMilliseconds(long startedTimestamp)
+    {
+        return (long)_timeProvider.GetElapsedTime(startedTimestamp).TotalMilliseconds;
+    }
+
+    private async Task PersistFailureStateAsync(
+        Func<Task> persist,
+        Guid jobId,
+        MeetingJobStage stage,
+        long stageStarted)
+    {
+        try
+        {
+            await persist();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                "Meeting processing event for job {JobId}; stage {Stage}; outcome {Outcome}; error code {ErrorCode}; exception {ExceptionType}; elapsed {ElapsedMilliseconds} ms",
+                jobId,
+                stage,
+                "FailureStatePersistenceFailed",
+                MeetingErrorCodes.DatabaseUnavailable,
+                exception.GetType().Name,
+                GetElapsedMilliseconds(stageStarted));
+            throw new MeetingProcessingAttemptException(
+                MeetingErrorCodes.DatabaseUnavailable,
+                "Meeting data storage is temporarily unavailable.");
+        }
+    }
+
+    private static Exception CreateSafeException(MeetingFailureClassification classification)
+    {
+        return classification.Kind == MeetingFailureKind.Permanent
+            ? new PermanentMeetingProcessingException(
+                $"{classification.ErrorCode}: {classification.SafeMessage}")
+            : new MeetingProcessingAttemptException(
+                classification.ErrorCode,
+                classification.SafeMessage);
     }
 
     private static MeetingMinutes CreateMeetingMinutes(

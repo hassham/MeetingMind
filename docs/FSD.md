@@ -60,10 +60,9 @@ The Worker executes this pipeline independently of the user session:
 6. Persist the minutes record and Markdown artifact.
 7. Mark the job completed.
 
-There is no separate transcript-cleanup stage in the current pipeline. Text
-normalization needed for chunk boundaries may be introduced as part of Phase 2
-long-meeting orchestration, but it must not be represented as an independent
-external processing provider.
+There is no separate transcript-cleanup stage. Application-layer long-meeting
+orchestration normalizes line endings only as part of bounded chunking; it is
+not an independent external processing provider.
 
 ### FR-004 — Job status and duration
 
@@ -119,9 +118,23 @@ Minutes contain:
 - Next steps.
 
 Short transcripts use one structured GPT request. Transcripts above the
-configured single-pass threshold must use bounded chunks, partial structured
-results, and hierarchical final aggregation. Merge behavior must preserve the
-schema and avoid deterministic duplicates.
+120,000-character single-pass threshold use sequential chunks of at most 60,000
+characters with up to 1,500 characters of overlap. Boundaries prefer paragraphs,
+sentences, whitespace, and a final hard bound. Transcripts above the configured
+1,200,000-character maximum fail permanently without truncation.
+
+Every chunk returns the complete minutes schema. Application orchestration
+normalizes and deterministically deduplicates strings case-insensitively while
+preserving order. Action items with matching normalized descriptions fill
+missing owner/due-date values; conflicting non-empty metadata remains separate.
+Bounded groups pass through sequential OpenAI aggregation tiers until one final
+result remains, with each serialized aggregation input limited to 120,000
+characters.
+
+Partial generation reports `GeneratingMinutes` progress from 60–85% and
+aggregation reports 86–89%. Transient partial or aggregation failures reach the
+configured Hangfire retry policy. A later attempt reuses the transcript but
+regenerates partials because partial minutes are not persisted.
 
 ### FR-008 — View and download results
 
@@ -162,7 +175,8 @@ without breaking selected-job polling.
 | `GET` | `/api/meetings/{jobId}/minutes/download` | Markdown minutes artifact |
 | `POST` | `/api/meetings/{jobId}/retry` | `202 Accepted` for an eligible manual retry |
 | `GET` | `/health` | API liveness |
-| `GET` | `/health/db` | Database check; expanded readiness is a Phase 2 deliverable |
+| `GET` | `/health/db` | PostgreSQL compatibility check |
+| `GET` | `/health/ready` | Aggregate PostgreSQL, storage-write, FFmpeg, and Whisper-model readiness |
 
 Unknown jobs return 404. Invalid uploads return 400. A retry of a job whose
 status is not retryable returns 409.
@@ -172,7 +186,7 @@ status is not retryable returns 409.
 ### MeetingJob
 
 `Id`, `OriginalFileName`, `OriginalFilePath`, `ProcessedFilePath`, `Status`,
-`Stage`, `Progress`, `ErrorMessage`, `HangfireJobId`, `AutomaticRetryCount`,
+`Stage`, `Progress`, `ErrorCode`, `ErrorMessage`, `HangfireJobId`, `AutomaticRetryCount`,
 `AutomaticRetryLimit`, `NextRetryAt`, `CreatedAt`, `StartedAt`, `CompletedAt`,
 and `UpdatedAt`.
 
@@ -199,9 +213,12 @@ The system distinguishes:
 - Transient failures, such as eligible timeouts, rate limiting, temporary
   network interruption, or transient persistence/provider faults.
 
-Every final failure records job status, stage, progress, a bounded sanitized
-error, and logs containing the job ID and exception context. Routine logs must
-not include full transcripts, secrets, provider payloads, or local paths.
+Every final failure records job status, stage, progress, a stable error code,
+and a bounded safe message. Structured logs record job ID, stage, outcome,
+attempt, progress, failure classification, exception type, and elapsed time.
+They do not record raw exception messages/objects, full transcripts, secrets,
+provider payloads, or physical paths. Exceptions returned to Hangfire are also
+replaced with safe code/message exceptions.
 
 Temporary storage I/O, FFmpeg/Whisper interruptions, retryable OpenAI responses,
 network timeouts, and transient persistence faults are eligible for automatic
@@ -230,6 +247,14 @@ missing checkpoint artifacts fall back to the nearest safe earlier stage.
 - Status transitions and persisted artifacts remain internally consistent.
 - Automatic retry is bounded and limited to transient failures.
 - Cleanup never removes active-job data.
+- Retention is disabled by default and configurable by enabled state, terminal
+  age, daily Hangfire schedule, and bounded batch size. Only terminal jobs with
+  no scheduled retry qualify. A PostgreSQL row lock protects the eligibility
+  check through artifact and cascading record deletion. All paths are
+  prevalidated within the storage root and reparse-point traversal is rejected.
+- Readiness returns only dependency names and healthy/unhealthy states. It
+  queries PostgreSQL, performs an in-root zero-byte write/delete probe, verifies
+  FFmpeg, and opens the configured Whisper model for reading.
 
 ### Security and privacy
 

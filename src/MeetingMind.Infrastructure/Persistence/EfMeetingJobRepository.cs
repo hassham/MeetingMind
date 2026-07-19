@@ -165,6 +165,7 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         meetingJob.Stage = MeetingJobStage.Uploaded;
         meetingJob.Progress = 0;
         meetingJob.ErrorMessage = null;
+        meetingJob.ErrorCode = null;
         meetingJob.HangfireJobId = null;
         meetingJob.AutomaticRetryCount = 0;
         meetingJob.AutomaticRetryLimit = 0;
@@ -192,6 +193,7 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         meetingJob.Stage = MeetingJobStage.Validating;
         meetingJob.Progress = 0;
         meetingJob.ErrorMessage = null;
+        meetingJob.ErrorCode = null;
         meetingJob.AutomaticRetryLimit = automaticRetryLimit;
         meetingJob.NextRetryAt = null;
         meetingJob.UpdatedAt = now;
@@ -203,6 +205,7 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         Guid meetingJobId,
         MeetingJobStage stage,
         int progress,
+        string errorCode,
         string errorMessage,
         int automaticRetryCount,
         int automaticRetryLimit,
@@ -215,6 +218,7 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         meetingJob.Stage = stage;
         meetingJob.Progress = progress;
         meetingJob.ErrorMessage = errorMessage;
+        meetingJob.ErrorCode = errorCode;
         meetingJob.AutomaticRetryCount = automaticRetryCount;
         meetingJob.AutomaticRetryLimit = automaticRetryLimit;
         meetingJob.NextRetryAt = nextRetryAt;
@@ -227,6 +231,7 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         Guid meetingJobId,
         MeetingJobStage stage,
         int progress,
+        string errorCode,
         string errorMessage,
         int automaticRetryCount,
         int automaticRetryLimit,
@@ -239,6 +244,7 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         meetingJob.Stage = stage;
         meetingJob.Progress = progress;
         meetingJob.ErrorMessage = errorMessage;
+        meetingJob.ErrorCode = errorCode;
         meetingJob.AutomaticRetryCount = automaticRetryCount;
         meetingJob.AutomaticRetryLimit = automaticRetryLimit;
         meetingJob.NextRetryAt = null;
@@ -264,6 +270,7 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         meetingJob.Stage = stage;
         meetingJob.Progress = progress;
         meetingJob.ErrorMessage = errorMessage;
+        meetingJob.ErrorCode = errorMessage is null ? null : meetingJob.ErrorCode;
         meetingJob.NextRetryAt = null;
         meetingJob.UpdatedAt = now;
 

@@ -43,6 +43,8 @@ public sealed class ConfigurationValidationTests : IDisposable
         });
         var automaticRetry = MeetingMindConfiguration.ValidateAutomaticRetryOptions(
             new AutomaticRetryOptions { DelaysInSeconds = [10, 60] });
+        var minutesGeneration = MeetingMindConfiguration.ValidateMeetingMinutesGenerationOptions(
+            new MeetingMinutesGenerationOptions());
 
         Assert.Equal(Path.GetFullPath(_temporaryRoot), firstStorage.RootPath);
         Assert.Equal(firstStorage.RootPath, secondStorage.RootPath);
@@ -52,6 +54,11 @@ public sealed class ConfigurationValidationTests : IDisposable
         Assert.Equal("test-key", openAi.ApiKey);
         Assert.Equal(2, automaticRetry.RetryLimit);
         Assert.Equal([10, 60], automaticRetry.DelaysInSeconds);
+        Assert.Equal(120000, minutesGeneration.SinglePassMaxCharacters);
+        Assert.Equal(60000, minutesGeneration.ChunkSizeCharacters);
+        Assert.Equal(1500, minutesGeneration.ChunkOverlapCharacters);
+        Assert.Equal(1200000, minutesGeneration.MaxTranscriptCharacters);
+        Assert.Equal(120000, minutesGeneration.MaxAggregationInputCharacters);
         Assert.Contains("Database=meetingmind", connectionString);
     }
 
@@ -140,6 +147,70 @@ public sealed class ConfigurationValidationTests : IDisposable
         Assert.Equal(2, filter.Attempts);
         Assert.Equal([10, 60], filter.DelaysInSeconds);
         Assert.Contains(typeof(PermanentMeetingProcessingException), filter.ExceptOn);
+    }
+
+    [Fact]
+    public void MinutesGenerationRejectsOverlapAtOrAboveChunkSize()
+    {
+        var options = new MeetingMinutesGenerationOptions
+        {
+            ChunkSizeCharacters = 100,
+            ChunkOverlapCharacters = 100
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            MeetingMindConfiguration.ValidateMeetingMinutesGenerationOptions(options));
+
+        Assert.Contains("MeetingMinutesGeneration:ChunkOverlapCharacters", exception.Message);
+    }
+
+    [Fact]
+    public void MinutesGenerationRejectsMaximumBelowSinglePassLimit()
+    {
+        var options = new MeetingMinutesGenerationOptions
+        {
+            SinglePassMaxCharacters = 1000,
+            ChunkSizeCharacters = 500,
+            ChunkOverlapCharacters = 50,
+            MaxTranscriptCharacters = 999
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            MeetingMindConfiguration.ValidateMeetingMinutesGenerationOptions(options));
+
+        Assert.Contains("MeetingMinutesGeneration:MaxTranscriptCharacters", exception.Message);
+    }
+
+    [Fact]
+    public void StorageRetentionDefaultsAreSafeAndAccepted()
+    {
+        var options = MeetingMindConfiguration.ValidateStorageRetentionOptions(
+            new StorageRetentionOptions());
+
+        Assert.False(options.Enabled);
+        Assert.Equal(30, options.RetentionDays);
+        Assert.Equal("0 2 * * *", options.Schedule);
+        Assert.Equal(100, options.BatchSize);
+    }
+
+    [Theory]
+    [InlineData(0, 100, "StorageRetention:RetentionDays")]
+    [InlineData(30, 0, "StorageRetention:BatchSize")]
+    [InlineData(30, 1001, "StorageRetention:BatchSize")]
+    public void StorageRetentionRejectsUnsafeBounds(
+        int retentionDays,
+        int batchSize,
+        string expectedSetting)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            MeetingMindConfiguration.ValidateStorageRetentionOptions(
+                new StorageRetentionOptions
+                {
+                    RetentionDays = retentionDays,
+                    BatchSize = batchSize
+                }));
+
+        Assert.Contains(expectedSetting, exception.Message);
     }
 
     public void Dispose()

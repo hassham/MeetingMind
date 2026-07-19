@@ -33,3 +33,9 @@ new product features are outside Phase 2.
 - [`QUESTIONS_p2_05_reliable_automatic_retries.md`](QUESTIONS_p2_05_reliable_automatic_retries.md)
   - failure classification, unknown-exception behavior, retry budget and state,
   persisted retry metadata, checkpoint resume, and renewed manual-retry budget.
+- [`QUESTIONS_p2_06_long_meeting_support.md`](QUESTIONS_p2_06_long_meeting_support.md)
+  - Application orchestration, character bounds, textual chunking, hierarchical
+  aggregation, deterministic deduplication, retries, and progress reporting.
+- [`QUESTIONS_p2_07_operational_hardening.md`](QUESTIONS_p2_07_operational_hardening.md)
+  - structured timing, privacy-safe diagnostics, readiness ownership,
+  retention scheduling, cleanup safety, and safe error disclosure.
