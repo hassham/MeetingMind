@@ -66,6 +66,30 @@
   cursor: pointer;
 }
 
+.history-pagination {
+  position: sticky;
+  bottom: 0;
+  padding-top: 10px;
+  background: #ffffff;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+[tabindex='-1']:focus-visible {
+  outline: 3px solid rgba(40, 95, 143, 0.45);
+  outline-offset: 4px;
+}
+
 .job-id {
   overflow-wrap: anywhere;
 }
@@ -146,6 +170,10 @@
   .metadata-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .history-pagination {
+    position: static;
+  }
 }
 
 @media (max-width: 640px) {
@@ -164,5 +192,15 @@
 
   .metadata-grid {
     grid-template-columns: 1fr;
+  }
+
+  .history-pagination {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .history-pagination .MuiButton-root {
+    width: 100%;
+    min-height: 44px;
   }
 }

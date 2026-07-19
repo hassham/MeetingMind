@@ -3,8 +3,15 @@
 This folder preserves planning and implementation decisions for the MeetingMind
 Phase 2 local production-readiness and hardening cycle.
 
-Active work remains tracked in the repository-root
-[`BACKLOG.md`](../../../BACKLOG.md).
+Phase 2 is complete. The repository-root [`BACKLOG.md`](../../../BACKLOG.md)
+now points here and confirms that Phase 3 has not started.
+
+## Completion records
+
+- [`BACKLOG_completed.md`](BACKLOG_completed.md) - the complete ordered Phase 2
+  backlog, boundaries, acceptance criteria, and completion statuses.
+- [`PHASE2_VERIFICATION.md`](PHASE2_VERIFICATION.md) - sanitized automated,
+  end-to-end, readiness, artifact, and real-browser release evidence.
 
 ## Confirmed scope
 
@@ -39,3 +46,9 @@ new product features are outside Phase 2.
 - [`QUESTIONS_p2_07_operational_hardening.md`](QUESTIONS_p2_07_operational_hardening.md)
   - structured timing, privacy-safe diagnostics, readiness ownership,
   retention scheduling, cleanup safety, and safe error disclosure.
+- [`QUESTIONS_p2_08_frontend_experience.md`](QUESTIONS_p2_08_frontend_experience.md)
+  - 20-item pagination, off-page selection and polling, retry presentation,
+  safe messaging, accessibility automation, focus, and responsive behavior.
+- [`QUESTIONS_p2_09_release_verification.md`](QUESTIONS_p2_09_release_verification.md)
+  - final gate environment, privacy-safe fixtures, long-meeting proof, retry
+  evidence, manual browser checks, completion archive, and Git finalization.

@@ -105,6 +105,10 @@ Rules:
 - Display structured minutes and transcript content.
 - Download transcript and Markdown minutes.
 - Initiate eligible manual retries.
+- Paginate history in 20-job pages without interrupting selected-job polling.
+- Present retry scheduling/exhaustion and safe error-code recovery guidance.
+- Move focus after selection, pagination, and actionable failures while using a
+  single polite live region for status, stage, and progress changes.
 
 The frontend performs no media, transcription, summarization, or persistence
 work.

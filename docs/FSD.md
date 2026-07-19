@@ -160,8 +160,10 @@ Manual retry resets the retry count and grants a fresh configured budget.
 
 The API returns persisted jobs newest first with `skip` and bounded `take`
 pagination. History includes filename, status, stage, progress, sanitized error,
-timestamps, and Phase 2 duration. The frontend must provide usable pagination
-without breaking selected-job polling.
+retry metadata, timestamps, and Phase 2 duration. The frontend shows 20 jobs per
+page with boundary-aware Previous/Next controls. A selected active job remains
+visible and continues one non-overlapping polling loop when its history card is
+on another page.
 
 ## 4. API contract
 
@@ -279,8 +281,11 @@ missing checkpoint artifacts fall back to the nearest safe earlier stage.
 - API contract tests cover successful and invalid request paths.
 - PostgreSQL integration tests verify persistence and retry state transitions.
 - Worker tests use test doubles for FFmpeg, Whisper, OpenAI, and storage.
-- Frontend tests cover upload, polling, history, result, duration, and retry
-  states.
+- Frontend tests cover upload, non-overlapping polling, paginated history,
+  off-page selection, results, duration, retry state, focus, and responsive
+  selection behavior. Axe scans fail on serious or critical violations in the
+  primary empty, active, completed, failed, and paginated states; color contrast
+  remains a manual browser check because jsdom has no layout model.
 - Real provider and media dependencies are used only in the documented local
   end-to-end acceptance run.
 

@@ -11,7 +11,11 @@ conversion, transcription, minutes generation, and result storage.
 
 ## Current status
 
-The local MVP is complete and has been verified with end-to-end audio tests.
+Phase 2 local hardening is complete and was verified on 2026-07-19. The
+sanitized completion evidence is preserved in the
+[Phase 2 verification record](docs/archive/phase2/PHASE2_VERIFICATION.md).
+Phase 3 has not started.
+
 The implemented workflow supports:
 
 - Uploading MP3, WAV, M4A, and AAC audio files.
@@ -203,7 +207,7 @@ Configure FFmpeg for the Worker and API readiness check with an absolute
 executable or folder path:
 
 ```powershell
-$ffmpegPath = "C:\path\to\ffmpeg.exe"
+$ffmpegPath = "C:\ffmpeg\build\bin\ffmpeg.exe"
 [Environment]::SetEnvironmentVariable(
   "AudioProcessing__FfmpegBinaryFolder",
   $ffmpegPath,
@@ -339,6 +343,21 @@ and history. Retries reuse a valid transcript checkpoint first, then valid
 processed audio; missing checkpoints fall back to the nearest safe earlier
 stage. Exhausted and permanent failures remain eligible for manual retry, which
 receives a fresh automatic-retry budget.
+
+## Frontend experience
+
+History is displayed in 20-job pages with Previous/Next controls and a total job
+count. Changing pages does not clear the selected meeting or interrupt its
+single non-overlapping status polling loop. History cards show automatic retry
+attempts, while details show scheduled retry timing, exhausted-retry guidance,
+and the manual retry action for eligible terminal jobs.
+
+The selected meeting remains synchronized with its history card. On narrow
+screens, selecting a meeting focuses and scrolls its details into view, and
+pagination controls become full-width touch targets. Status, stage, and progress
+share one polite live announcement; selection, pagination, and actionable
+errors use intentional keyboard focus. Missing results and known safe error
+codes provide state-specific Refresh or Retry guidance.
 
 ## Long-meeting generation
 
@@ -497,7 +516,7 @@ database as the API.
 Confirm `ffmpeg.exe` exists at the configured absolute path, then set:
 
 ```powershell
-$env:AudioProcessing__FfmpegBinaryFolder = "C:\path\to\ffmpeg.exe"
+$env:AudioProcessing__FfmpegBinaryFolder = "C:\ffmpeg\build\bin\ffmpeg.exe"
 ```
 
 ### Whisper model download fails
@@ -545,6 +564,8 @@ volume.
 - [Software Architecture Document](docs/SAD.md)
 - [Functional Specification Document](docs/FSD.md)
 - [Backlog](BACKLOG.md)
+- [Phase 2 archive](docs/archive/phase2/README.md)
+- [Phase 2 verification record](docs/archive/phase2/PHASE2_VERIFICATION.md)
 - [Agent instructions](AGENTS.md)
 
 ## License

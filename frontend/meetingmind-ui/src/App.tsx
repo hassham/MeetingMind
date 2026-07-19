@@ -24,7 +24,7 @@ import {
   createTheme,
 } from '@mui/material'
 import axios from 'axios'
-import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 type UploadResponse = {
@@ -38,7 +38,11 @@ type JobStatusResponse = {
   status: string
   stage: string
   progress: number
+  errorCode: string | null
   errorMessage: string | null
+  automaticRetryCount: number
+  automaticRetryLimit: number
+  nextRetryAt: string | null
   processingDurationSeconds: number
   totalDurationSeconds: number
 }
@@ -49,7 +53,11 @@ type HistoryItem = {
   status: string
   stage: string
   progress: number
+  errorCode: string | null
   errorMessage: string | null
+  automaticRetryCount: number
+  automaticRetryLimit: number
+  nextRetryAt: string | null
   createdAt: string
   updatedAt: string
   startedAt: string | null
@@ -78,7 +86,11 @@ function mergeStatusIntoHistoryItem(
     status: status.status,
     stage: status.stage,
     progress: status.progress,
+    errorCode: status.errorCode,
     errorMessage: status.errorMessage,
+    automaticRetryCount: status.automaticRetryCount,
+    automaticRetryLimit: status.automaticRetryLimit,
+    nextRetryAt: status.nextRetryAt,
     processingDurationSeconds: status.processingDurationSeconds,
     totalDurationSeconds: status.totalDurationSeconds,
   }
@@ -129,10 +141,12 @@ const theme = createTheme({
 
 const activeStatuses = new Set(['Queued', 'Processing'])
 const retryableStatuses = new Set(['Failed', 'Cancelled'])
+const historyPageSize = 20
 
 function App() {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [historyTotal, setHistoryTotal] = useState(0)
+  const [historyPage, setHistoryPage] = useState(0)
   const [selectedJob, setSelectedJob] = useState<JobStatusResponse | null>(null)
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<HistoryItem | null>(null)
   const [minutes, setMinutes] = useState<MinutesResult | null>(null)
@@ -144,6 +158,11 @@ function App() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [liveDurationOffsetSeconds, setLiveDurationOffsetSeconds] = useState(0)
+  const historyHeadingRef = useRef<HTMLHeadingElement>(null)
+  const detailHeadingRef = useRef<HTMLHeadingElement>(null)
+  const errorAlertRef = useRef<HTMLDivElement>(null)
+  const jobErrorAlertRef = useRef<HTMLDivElement>(null)
+  const paginationFocusPendingRef = useRef(false)
 
   const selectedJobId = selectedJob?.jobId ?? selectedHistoryItem?.jobId ?? null
   const canRetry = selectedJob ? retryableStatuses.has(selectedJob.status) : false
@@ -155,6 +174,7 @@ function App() {
   const selectedTotalDurationSeconds = selectedJob
     ? selectedJob.totalDurationSeconds + (isPolling ? liveDurationOffsetSeconds : 0)
     : 0
+  const historyPageCount = Math.max(1, Math.ceil(historyTotal / historyPageSize))
 
   const selectedFileName = useMemo(() => {
     if (!selectedJobId) {
@@ -168,21 +188,43 @@ function App() {
     )
   }, [history, selectedHistoryItem?.originalFileName, selectedJobId])
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async (page: number) => {
     setIsHistoryLoading(true)
     setError(null)
 
     try {
       const response = await axios.get<HistoryResponse>('/api/meetings/history', {
-        params: { skip: 0, take: 50 },
+        params: { skip: page * historyPageSize, take: historyPageSize },
       })
 
       setHistory(response.data.items)
       setHistoryTotal(response.data.total)
+      setSelectedHistoryItem((current) => {
+        if (!current) {
+          return current
+        }
+
+        return response.data.items.find((item) => item.jobId === current.jobId) ?? current
+      })
+
+      if (response.data.items.length === 0 && response.data.total > 0 && page > 0) {
+        setHistoryPage(Math.max(0, Math.ceil(response.data.total / historyPageSize) - 1))
+      }
     } catch (requestError) {
       setError(getRequestErrorMessage(requestError, 'History could not be loaded.'))
     } finally {
       setIsHistoryLoading(false)
+      if (paginationFocusPendingRef.current) {
+        paginationFocusPendingRef.current = false
+        historyHeadingRef.current?.focus()
+      }
+    }
+  }, [])
+
+  const focusSelectedJob = useCallback(() => {
+    detailHeadingRef.current?.focus()
+    if (window.matchMedia?.('(max-width: 980px)').matches) {
+      detailHeadingRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
     }
   }, [])
 
@@ -235,6 +277,10 @@ function App() {
       stage: item.stage,
       progress: item.progress,
       errorMessage: item.errorMessage,
+      errorCode: item.errorCode,
+      automaticRetryCount: item.automaticRetryCount,
+      automaticRetryLimit: item.automaticRetryLimit,
+      nextRetryAt: item.nextRetryAt,
       processingDurationSeconds: item.processingDurationSeconds,
       totalDurationSeconds: item.totalDurationSeconds,
     })
@@ -243,7 +289,10 @@ function App() {
     setTranscript(null)
     setMessage(null)
     setError(null)
-    await loadStatus(item.jobId)
+    const latestStatus = await loadStatus(item.jobId)
+    if (!(latestStatus.errorMessage && retryableStatuses.has(latestStatus.status))) {
+      focusSelectedJob()
+    }
   }
 
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -272,6 +321,10 @@ function App() {
         stage: job.stage,
         progress: 0,
         errorMessage: null,
+        errorCode: null,
+        automaticRetryCount: 0,
+        automaticRetryLimit: 0,
+        nextRetryAt: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         startedAt: null,
@@ -285,13 +338,19 @@ function App() {
         stage: job.stage,
         progress: 0,
         errorMessage: null,
+        errorCode: null,
+        automaticRetryCount: 0,
+        automaticRetryLimit: 0,
+        nextRetryAt: null,
         processingDurationSeconds: 0,
         totalDurationSeconds: 0,
       })
       setLiveDurationOffsetSeconds(0)
       setMessage('Upload accepted. Processing has started.')
-      await loadHistory()
+      setHistoryPage(0)
+      await loadHistory(0)
       await loadStatus(job.jobId)
+      focusSelectedJob()
     } catch (requestError) {
       setError(getRequestErrorMessage(requestError, 'Upload failed.'))
     } finally {
@@ -315,6 +374,10 @@ function App() {
         stage: response.data.stage,
         progress: 0,
         errorMessage: null,
+        errorCode: null,
+        automaticRetryCount: 0,
+        automaticRetryLimit: previousJob?.automaticRetryLimit ?? 0,
+        nextRetryAt: null,
         processingDurationSeconds: previousJob?.processingDurationSeconds ?? 0,
         totalDurationSeconds: previousJob?.totalDurationSeconds ?? 0,
       })
@@ -322,7 +385,7 @@ function App() {
       setMinutes(null)
       setTranscript(null)
       setMessage('Retry queued. Processing has restarted.')
-      await loadHistory()
+      await loadHistory(historyPage)
       await loadStatus(jobId)
     } catch (requestError) {
       setError(getRequestErrorMessage(requestError, 'Retry failed.'))
@@ -331,23 +394,56 @@ function App() {
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {
-      void loadHistory()
+      void loadHistory(historyPage)
     }, 0)
 
     return () => window.clearTimeout(timerId)
-  }, [loadHistory])
+  }, [historyPage, loadHistory])
 
   useEffect(() => {
     if (!selectedJobId || !isPolling) {
       return
     }
 
-    const timerId = window.setInterval(() => {
-      void loadStatus(selectedJobId)
-    }, 5000)
+    let cancelled = false
+    let timerId: number | undefined
 
-    return () => window.clearInterval(timerId)
+    const poll = async () => {
+      try {
+        await loadStatus(selectedJobId)
+      } finally {
+        if (!cancelled) {
+          timerId = window.setTimeout(() => void poll(), 5000)
+        }
+      }
+    }
+
+    timerId = window.setTimeout(() => void poll(), 5000)
+
+    return () => {
+      cancelled = true
+      if (timerId !== undefined) {
+        window.clearTimeout(timerId)
+      }
+    }
   }, [isPolling, loadStatus, selectedJobId])
+
+  useEffect(() => {
+    if (error) {
+      errorAlertRef.current?.focus()
+    }
+  }, [error])
+
+  useEffect(() => {
+    if (selectedJob?.errorMessage && retryableStatuses.has(selectedJob.status)) {
+      jobErrorAlertRef.current?.focus()
+    }
+  }, [selectedJob?.errorMessage, selectedJob?.status])
+
+  function changeHistoryPage(nextPage: number) {
+    paginationFocusPendingRef.current = true
+    setHistoryPage(nextPage)
+  }
 
   useEffect(() => {
     if (!selectedJobId || !isPolling) {
@@ -385,30 +481,25 @@ function App() {
                 <Button
                   variant="outlined"
                   startIcon={<RefreshOutlinedIcon />}
-                  onClick={() => void loadHistory()}
+                  onClick={() => void loadHistory(historyPage)}
                   disabled={isHistoryLoading}
                 >
                   Refresh
                 </Button>
-                <Button
-                  component="label"
-                  variant="contained"
-                  startIcon={<CloudUploadOutlinedIcon />}
-                  disabled={isUploading}
-                >
-                  {isUploading ? 'Uploading' : 'Upload'}
-                  <input
-                    hidden
-                    type="file"
-                    accept=".mp3,.wav,.m4a,.aac,audio/mpeg,audio/wav,audio/mp4,audio/aac"
-                    onChange={(event) => void handleUpload(event)}
-                  />
-                </Button>
+                <FileUploadButton
+                  label="Upload"
+                  isUploading={isUploading}
+                  onUpload={handleUpload}
+                />
               </Stack>
             </Stack>
 
             {message ? <Alert severity="success">{message}</Alert> : null}
-            {error ? <Alert severity="error">{error}</Alert> : null}
+            {error ? (
+              <Alert ref={errorAlertRef} severity="error" tabIndex={-1}>
+                {error}
+              </Alert>
+            ) : null}
 
             <Box className="workspace-grid">
               <Box className="surface history-panel">
@@ -416,7 +507,13 @@ function App() {
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Stack direction="row" spacing={1} alignItems="center">
                       <HistoryOutlinedIcon color="primary" />
-                      <Typography variant="h6" fontWeight={700}>
+                      <Typography
+                        ref={historyHeadingRef}
+                        component="h2"
+                        variant="h6"
+                        fontWeight={700}
+                        tabIndex={-1}
+                      >
                         History
                       </Typography>
                     </Stack>
@@ -439,6 +536,7 @@ function App() {
                           <button
                             className="history-select"
                             type="button"
+                            aria-pressed={item.jobId === selectedJobId}
                             onClick={() => void selectHistoryJob(item)}
                           >
                             <Stack spacing={1}>
@@ -451,9 +549,19 @@ function App() {
                                 <Typography fontWeight={700} noWrap>
                                   {item.originalFileName}
                                 </Typography>
-                                <StatusChip status={item.status} />
+                                <Stack direction="row" spacing={0.75} alignItems="center">
+                                  {item.automaticRetryCount > 0 ? (
+                                    <Chip
+                                      label={`Retry ${item.automaticRetryCount}/${item.automaticRetryLimit}`}
+                                      size="small"
+                                      variant="outlined"
+                                    />
+                                  ) : null}
+                                  <StatusChip status={item.status} />
+                                </Stack>
                               </Stack>
                               <LinearProgress
+                                aria-label={`${item.originalFileName} progress`}
                                 variant="determinate"
                                 value={item.progress}
                                 sx={{ height: 7, borderRadius: 4 }}
@@ -486,6 +594,32 @@ function App() {
                       ))
                     )}
                   </Stack>
+
+                  <Stack
+                    className="history-pagination"
+                    direction={{ xs: 'column', sm: 'row' }}
+                    justifyContent="space-between"
+                    alignItems="center"
+                    spacing={1}
+                  >
+                    <Button
+                      variant="outlined"
+                      disabled={historyPage === 0 || isHistoryLoading}
+                      onClick={() => changeHistoryPage(historyPage - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Typography aria-live="polite" textAlign="center">
+                      Page {historyPage + 1} of {historyPageCount}
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      disabled={historyPage + 1 >= historyPageCount || isHistoryLoading}
+                      onClick={() => changeHistoryPage(historyPage + 1)}
+                    >
+                      Next
+                    </Button>
+                  </Stack>
                 </Stack>
               </Box>
 
@@ -500,7 +634,13 @@ function App() {
                         spacing={2}
                       >
                         <Box>
-                          <Typography variant="h6" fontWeight={700}>
+                          <Typography
+                            ref={detailHeadingRef}
+                            component="h2"
+                            variant="h6"
+                            fontWeight={700}
+                            tabIndex={-1}
+                          >
                             {selectedFileName}
                           </Typography>
                           <Typography className="job-id" color="text.secondary">
@@ -523,19 +663,60 @@ function App() {
                       </Stack>
 
                       <Box>
+                        <Box
+                          className="visually-hidden"
+                          role="status"
+                          aria-live="polite"
+                          aria-atomic="true"
+                        >
+                          Status {selectedJob.status}. Stage {selectedJob.stage}. Progress{' '}
+                          {selectedJob.progress} percent.
+                        </Box>
                         <Stack direction="row" justifyContent="space-between" spacing={2}>
                           <Typography fontWeight={700}>{selectedJob.stage}</Typography>
                           <Typography fontWeight={700}>{selectedJob.progress}%</Typography>
                         </Stack>
                         <LinearProgress
+                          aria-label="Selected meeting progress"
                           variant="determinate"
                           value={selectedJob.progress}
                           sx={{ height: 9, borderRadius: 5, mt: 1 }}
                         />
                       </Box>
 
+                      {selectedJob.stage === 'GeneratingMinutes' ? (
+                        <Alert severity="info">
+                          Generating meeting minutes. Longer meetings may be processed in
+                          multiple sections, so progress can advance gradually.
+                        </Alert>
+                      ) : null}
+
+                      {selectedJob.nextRetryAt ? (
+                        <Alert severity="info">
+                          Automatic retry {selectedJob.automaticRetryCount} of{' '}
+                          {selectedJob.automaticRetryLimit} is scheduled{' '}
+                          {formatRetryCountdown(selectedJob.nextRetryAt)}.
+                        </Alert>
+                      ) : null}
+
+                      {selectedJob.status === 'Failed' &&
+                      selectedJob.automaticRetryLimit > 0 &&
+                      selectedJob.automaticRetryCount >= selectedJob.automaticRetryLimit ? (
+                        <Alert severity="warning">
+                          Automatic retries are exhausted. Review the failure and retry
+                          manually when ready.
+                        </Alert>
+                      ) : null}
+
                       {selectedJob.errorMessage ? (
-                        <Alert severity="error">{selectedJob.errorMessage}</Alert>
+                        <Alert ref={jobErrorAlertRef} severity="error" tabIndex={-1}>
+                          <Typography>{selectedJob.errorMessage}</Typography>
+                          {getErrorGuidance(selectedJob.errorCode) ? (
+                            <Typography variant="body2">
+                              {getErrorGuidance(selectedJob.errorCode)}
+                            </Typography>
+                          ) : null}
+                        </Alert>
                       ) : null}
 
                       <Accordion className="processing-details" disableGutters elevation={0}>
@@ -575,6 +756,7 @@ function App() {
                         <Button
                           component="a"
                           href={`/api/meetings/${selectedJob.jobId}/transcript/download`}
+                          disabled={selectedJob.status !== 'Completed'}
                           variant="outlined"
                           startIcon={<DownloadOutlinedIcon />}
                         >
@@ -583,6 +765,7 @@ function App() {
                         <Button
                           component="a"
                           href={`/api/meetings/${selectedJob.jobId}/minutes/download`}
+                          disabled={selectedJob.status !== 'Completed'}
                           variant="outlined"
                           startIcon={<DownloadOutlinedIcon />}
                         >
@@ -593,24 +776,45 @@ function App() {
                       <Tabs
                         value={activeTab}
                         onChange={(_, nextValue: number) => setActiveTab(nextValue)}
+                        aria-label="Meeting results"
                       >
-                        <Tab label="Minutes" />
-                        <Tab label="Transcript" />
+                        <Tab
+                          id="meeting-results-tab-0"
+                          aria-controls="meeting-results-panel-0"
+                          label="Minutes"
+                        />
+                        <Tab
+                          id="meeting-results-tab-1"
+                          aria-controls="meeting-results-panel-1"
+                          label="Transcript"
+                        />
                       </Tabs>
 
-                      {activeTab === 0 ? (
-                        <MinutesPanel
-                          isLoading={isResultLoading}
-                          minutes={minutes}
-                          status={selectedJob.status}
-                        />
-                      ) : (
-                        <TranscriptPanel
-                          isLoading={isResultLoading}
-                          transcript={transcript}
-                          status={selectedJob.status}
-                        />
-                      )}
+                      <Box
+                        role="tabpanel"
+                        id={`meeting-results-panel-${activeTab}`}
+                        aria-labelledby={`meeting-results-tab-${activeTab}`}
+                      >
+                        {activeTab === 0 ? (
+                          <MinutesPanel
+                            isLoading={isResultLoading}
+                            minutes={minutes}
+                            status={selectedJob.status}
+                            canRetry={canRetry}
+                            onRefresh={() => void loadStatus(selectedJob.jobId)}
+                            onRetry={() => void retryJob(selectedJob.jobId)}
+                          />
+                        ) : (
+                          <TranscriptPanel
+                            isLoading={isResultLoading}
+                            transcript={transcript}
+                            status={selectedJob.status}
+                            canRetry={canRetry}
+                            onRefresh={() => void loadStatus(selectedJob.jobId)}
+                            onRetry={() => void retryJob(selectedJob.jobId)}
+                          />
+                        )}
+                      </Box>
                     </Stack>
                   ) : (
                     <Stack spacing={1}>
@@ -656,22 +860,45 @@ function UploadPanel({
             <Typography color="text.secondary">MP3, WAV, M4A, AAC</Typography>
           </Box>
         </Stack>
-        <Button
-          component="label"
-          variant="contained"
-          startIcon={<CloudUploadOutlinedIcon />}
-          disabled={isUploading}
-        >
-          {isUploading ? 'Uploading' : 'Select file'}
-          <input
-            hidden
-            type="file"
-            accept=".mp3,.wav,.m4a,.aac,audio/mpeg,audio/wav,audio/mp4,audio/aac"
-            onChange={(event) => onUpload(event)}
-          />
-        </Button>
+        <FileUploadButton
+          label="Select file"
+          isUploading={isUploading}
+          onUpload={onUpload}
+        />
       </Stack>
     </Box>
+  )
+}
+
+function FileUploadButton({
+  label,
+  isUploading,
+  onUpload,
+}: {
+  label: string
+  isUploading: boolean
+  onUpload: (event: ChangeEvent<HTMLInputElement>) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <>
+      <Button
+        variant="contained"
+        startIcon={<CloudUploadOutlinedIcon />}
+        disabled={isUploading}
+        onClick={() => inputRef.current?.click()}
+      >
+        {isUploading ? 'Uploading' : label}
+      </Button>
+      <input
+        ref={inputRef}
+        hidden
+        type="file"
+        accept=".mp3,.wav,.m4a,.aac,audio/mpeg,audio/wav,audio/mp4,audio/aac"
+        onChange={(event) => onUpload(event)}
+      />
+    </>
   )
 }
 
@@ -679,10 +906,16 @@ function MinutesPanel({
   isLoading,
   minutes,
   status,
+  canRetry,
+  onRefresh,
+  onRetry,
 }: {
   isLoading: boolean
   minutes: MinutesResult | null
   status: string
+  canRetry: boolean
+  onRefresh: () => void
+  onRetry: () => void
 }) {
   if (isLoading) {
     return <Typography color="text.secondary">Loading minutes...</Typography>
@@ -690,11 +923,13 @@ function MinutesPanel({
 
   if (!minutes) {
     return (
-      <Typography color="text.secondary">
-        {status === 'Completed'
-          ? 'Minutes are not available for this job.'
-          : 'Minutes will appear when processing is completed.'}
-      </Typography>
+      <UnavailableResult
+        label="Minutes"
+        status={status}
+        canRetry={canRetry}
+        onRefresh={onRefresh}
+        onRetry={onRetry}
+      />
     )
   }
 
@@ -720,10 +955,16 @@ function TranscriptPanel({
   isLoading,
   transcript,
   status,
+  canRetry,
+  onRefresh,
+  onRetry,
 }: {
   isLoading: boolean
   transcript: string | null
   status: string
+  canRetry: boolean
+  onRefresh: () => void
+  onRetry: () => void
 }) {
   if (isLoading) {
     return <Typography color="text.secondary">Loading transcript...</Typography>
@@ -731,15 +972,53 @@ function TranscriptPanel({
 
   if (!transcript) {
     return (
-      <Typography color="text.secondary">
-        {status === 'Completed'
-          ? 'Transcript is not available for this job.'
-          : 'Transcript will appear when processing is completed.'}
-      </Typography>
+      <UnavailableResult
+        label="Transcript"
+        status={status}
+        canRetry={canRetry}
+        onRefresh={onRefresh}
+        onRetry={onRetry}
+      />
     )
   }
 
   return <Box className="transcript-box">{transcript}</Box>
+}
+
+function UnavailableResult({
+  label,
+  status,
+  canRetry,
+  onRefresh,
+  onRetry,
+}: {
+  label: 'Minutes' | 'Transcript'
+  status: string
+  canRetry: boolean
+  onRefresh: () => void
+  onRetry: () => void
+}) {
+  const message = activeStatuses.has(status)
+    ? `${label} will appear after processing completes.`
+    : status === 'Completed'
+      ? `${label} could not be loaded even though processing completed. Refresh and try again.`
+      : `${label} is unavailable because processing did not complete successfully.`
+
+  return (
+    <Stack spacing={1.5} alignItems="flex-start">
+      <Typography color="text.secondary">{message}</Typography>
+      <Stack direction="row" spacing={1} flexWrap="wrap">
+        <Button size="small" variant="outlined" onClick={onRefresh}>
+          Refresh status
+        </Button>
+        {canRetry ? (
+          <Button size="small" startIcon={<ReplayOutlinedIcon />} onClick={onRetry}>
+            Retry processing
+          </Button>
+        ) : null}
+      </Stack>
+    </Stack>
+  )
 }
 
 function ResultSection({ title, items }: { title: string; items: string[] }) {
@@ -815,6 +1094,39 @@ function formatDate(value: string | null | undefined) {
   }).format(new Date(value))
 }
 
+function formatRetryCountdown(nextRetryAt: string) {
+  const seconds = Math.max(0, Math.ceil((new Date(nextRetryAt).getTime() - Date.now()) / 1000))
+  return seconds === 0 ? 'now' : `in ${formatDuration(seconds)}`
+}
+
+function getErrorGuidance(errorCode: string | null) {
+  switch (errorCode) {
+    case 'upload_validation':
+    case 'invalid_input':
+    case 'unsupported_media':
+      return 'Choose a supported MP3, WAV, M4A, or AAC recording within the upload limit.'
+    case 'provider_unavailable':
+    case 'temporary_interruption':
+    case 'storage_unavailable':
+    case 'database_unavailable':
+    case 'unexpected_failure':
+      return 'MeetingMind will retry temporary failures automatically when retry capacity remains.'
+    case 'provider_rejected':
+    case 'processing_configuration':
+    case 'required_resource_missing':
+    case 'resource_access_denied':
+      return 'Check the local Worker configuration and dependency readiness before retrying.'
+    case 'storage_full':
+      return 'Free local storage space before retrying this meeting.'
+    case 'invalid_provider_response':
+      return 'Retry the meeting. If the problem repeats, verify the configured minutes provider.'
+    case 'database_failure':
+      return 'Check PostgreSQL and apply all pending database migrations before retrying.'
+    default:
+      return null
+  }
+}
+
 function formatDuration(totalSeconds: number) {
   const normalizedSeconds = Math.max(0, Math.floor(totalSeconds || 0))
   const hours = Math.floor(normalizedSeconds / 3600)
@@ -835,8 +1147,10 @@ function formatDuration(totalSeconds: number) {
 }
 
 function getRequestErrorMessage(requestError: unknown, fallback: string) {
-  if (axios.isAxiosError<{ error?: string }>(requestError)) {
-    return requestError.response?.data?.error ?? requestError.message ?? fallback
+  if (axios.isAxiosError<{ error?: string; errorCode?: string }>(requestError)) {
+    const message = requestError.response?.data?.error ?? requestError.message ?? fallback
+    const guidance = getErrorGuidance(requestError.response?.data?.errorCode ?? null)
+    return guidance ? `${message} ${guidance}` : message
   }
 
   return fallback
