@@ -8,9 +8,9 @@ next," see `BACKLOG.md` instead — this file should rarely need edits mid-sprin
 
 MeetingMind AI converts uploaded meeting audio into a transcript and
 structured, AI-generated meeting minutes (decisions, action items, risks,
-next steps). The completed MVP and the active Phase 2 hardening cycle run as a
-trusted local application. Cloud deployment is a future delivery cycle, not
-part of Phase 2.
+next steps). The completed MVP/Phase 2 hardening cycle and the active Phase 3
+product-expansion cycle run as a trusted local application. Cloud deployment is
+a future delivery cycle, not part of Phase 3.
 
 Full specs live in `/docs`:
 - `docs/PRD.md` — product requirements, scope, user stories
@@ -28,7 +28,7 @@ architecture, or requirements — don't guess when it's already specified.
 - **Background processing:** Hangfire for queueing, background jobs, retries, and workflow execution
 - **Audio processing:** FFmpeg (wrapped behind `IAudioProcessingService`, never called directly from controllers)
 - **AI services:** local Whisper.net (transcription), OpenAI GPT (minutes generation)
-- **Storage:** local file storage through Phase 2 (`Storage/Audio`,
+- **Storage:** local file storage through Phase 3 (`Storage/Audio`,
   `Storage/Transcript`, `Storage/Minutes`), behind `IFileStorageService` for a
   possible future S3/Blob swap
 
@@ -80,9 +80,9 @@ and returns immediately.
   orchestrator; Infrastructure implements only the single-call generation
   client. This is what makes the cloud migration path (see SAD §14) possible
   later — don't bypass it for convenience.
-- **No authentication in Phase 2.** All endpoints, including retry and the
-  Hangfire dashboard, remain unauthenticated because Phase 2 is restricted to a
-  trusted local deployment (see PRD §6, FSD §§1 and 7, SAD §12). Do not add auth
+- **No authentication in Phase 3.** All endpoints, including retry and the
+  Hangfire dashboard, remain unauthenticated because Phase 3 is restricted to a
+  trusted local deployment (see PRD §6, FSD §§1 and 7, SAD §11). Do not add auth
   scaffolding unless a later delivery cycle explicitly changes that boundary.
 
 ## Background job / queue decision

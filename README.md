@@ -14,7 +14,11 @@ conversion, transcription, minutes generation, and result storage.
 Phase 2 local hardening is complete and was verified on 2026-07-19. The
 sanitized completion evidence is preserved in the
 [Phase 2 verification record](docs/archive/phase2/PHASE2_VERIFICATION.md).
-Phase 3 has not started.
+Phase 3 requirements and architecture are approved and P3-01 documentation
+reconciliation is in progress. Phase 3 production features are not yet
+implemented; the implemented workflow described below remains the Phase 2
+baseline. See the [active backlog](BACKLOG.md) and
+[Phase 3 plan](docs/phase3/PLAN.md).
 
 The implemented workflow supports:
 
@@ -563,7 +567,10 @@ volume.
 - [Product Requirements Document](docs/PRD.md)
 - [Software Architecture Document](docs/SAD.md)
 - [Functional Specification Document](docs/FSD.md)
+- [Local run and test guide](LOCAL_RUN_AND_TEST_GUIDE.md)
 - [Backlog](BACKLOG.md)
+- [Phase 3 plan](docs/phase3/PLAN.md)
+- [Phase 3 UX contract](docs/phase3/UX.md)
 - [Phase 2 archive](docs/archive/phase2/README.md)
 - [Phase 2 verification record](docs/archive/phase2/PHASE2_VERIFICATION.md)
 - [Agent instructions](AGENTS.md)

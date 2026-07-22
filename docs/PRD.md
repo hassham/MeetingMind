@@ -2,198 +2,250 @@
 
 **Product:** MeetingMind AI
 
-**Version:** 2.0
+**Version:** 3.0
 
-**Status:** Approved for Phase 2
+**Status:** Approved for Phase 3
 
 **Product owner:** Hasham Ahmad
 
-**Last reconciled with code:** 2026-07-17
+**Approved:** 2026-07-22
 
 ## 1. Vision
 
-MeetingMind AI converts uploaded meeting recordings into transcripts and
-structured, actionable meeting minutes. It helps users retain decisions,
-action items, risks, and next steps without preparing notes manually.
-
-The long-term vision is a searchable meeting-intelligence platform. The current
-product boundary is a trusted local application.
+MeetingMind AI converts meeting recordings or existing transcripts into useful
+records: readable transcripts, structured meeting minutes, and independently
+trackable actions. The long-term vision is a searchable meeting-intelligence
+platform. Phase 3 remains a trusted local application.
 
 ## 2. Current product state
 
-Phase 1 delivered the local MVP:
+Phase 1 delivered asynchronous audio-to-transcript-and-minutes processing.
+Phase 2 completed local production hardening: portable configuration, automated
+verification, bounded retries, long-transcript aggregation, duration reporting,
+safe retention, readiness checks, accessibility, and operational guidance.
 
-- MP3, WAV, M4A, and AAC upload with extension, MIME, filename, and size
-  validation.
-- Immediate job creation and Hangfire enqueueing by the API.
-- A separate Worker process for the long-running pipeline.
-- FFmpeg conversion to PCM 16-bit, 16 kHz, mono WAV.
-- Local Whisper.net transcription.
-- OpenAI GPT structured meeting-minutes generation.
-- Persisted status, progress, history, errors, transcripts, and minutes.
-- Result viewing, downloads, and manual retry for failed or cancelled jobs.
-- A React and Material UI frontend.
+Phase 3 is the active delivery cycle. No Phase 3 production feature is complete
+until its backlog package passes its acceptance gate.
 
-Phase 2 is a local production-readiness and hardening cycle. It is not the cloud
-migration cycle.
-
-## 3. Goals
+## 3. Phase 3 goals
 
 ### User goals
 
-- Upload a supported meeting recording.
-- Receive a job ID without waiting for processing.
-- Understand the current status, stage, progress, duration, and failure state.
-- Receive useful minutes for both short and long meetings.
-- Recover from transient failures without uploading the recording again.
-- View and download current and historical results.
+- Start from a dashboard that summarizes processing activity and outcomes.
+- Choose audio transcription only or full audio-to-minutes processing.
+- Upload an existing `.txt` or `.md` transcript to generate minutes.
+- Read transcripts with meaningful paragraphs and paragraph timestamps.
+- Browse completed meeting minutes separately from processing history.
+- Turn generated action items into independent actions.
+- Create, manage, link, unlink, delete, filter, and export independent actions.
+- Trace an action to a meeting when provenance exists without reopening or
+  changing the completed meeting workflow.
 
 ### Technical goals
 
-- Keep all long-running work outside the HTTP request.
-- Make transient failures recover automatically through configurable policy.
-- Make local setup portable across developer machines.
-- Improve verification across API, persistence, Worker, and frontend boundaries.
-- Keep Domain and Application logic independent of provider implementations.
-- Retain a future cloud migration path without deploying to cloud in Phase 2.
+- Preserve asynchronous API/Worker separation for every processing mode.
+- Evolve one job model with explicit, validated processing modes.
+- Preserve provider-neutral transcript segments and deterministic formatting.
+- Keep completed meetings/minutes immutable while actions have an independent
+  lifecycle and repository boundary.
+- Provide bounded aggregate, paging, filtering, and optimistic-concurrency
+  contracts.
+- Upgrade Phase 2 data safely and backfill generated actions idempotently.
 
 ## 4. Target users
 
-The trusted-local release is intended for project managers, scrum masters,
-engineering teams, business analysts, product owners, consultants, and small
-businesses evaluating or using the application on a controlled machine.
+The trusted-local release serves project managers, scrum masters, engineering
+teams, business analysts, product owners, consultants, and small businesses
+using the application on a controlled machine.
 
-Enterprise, regulated, shared, and public deployments require later security
-and tenancy work.
+Enterprise, regulated, shared, and public use requires a later security and
+tenancy cycle.
 
-## 5. Phase 2 scope
+## 5. Phase 3 scope
 
-Phase 2 includes:
+### Processing choices
 
-- Requirements and architecture reconciliation.
-- Automated API, persistence, Worker-pipeline, and frontend verification.
-- Portable configuration, startup validation, and safe local secret handling.
-- Explicit processing-duration reporting.
-- Classified and configurable automatic retry for transient failures while
-  retaining manual retry.
-- Transcript chunking, partial structured summaries, and hierarchical final
-  aggregation for long meetings.
-- Structured stage logging, readiness checks, safe errors, and configurable
-  storage retention.
-- Frontend duration, retry state, history pagination, error messaging, and
-  accessibility improvements.
-- A documented Phase 2 end-to-end acceptance run.
+- `TranscriptOnly`: supported audio to a readable transcript.
+- `FullMeeting`: supported audio to a readable transcript and structured
+  minutes.
+- `MinutesFromTranscript`: validated UTF-8 `.txt` or `.md` transcript to
+  structured minutes.
+- The existing full-audio upload endpoint remains a deprecated compatibility
+  alias during Phase 3.
+
+### Dashboard and navigation
+
+- Dashboard is the initial screen.
+- Primary destinations are Dashboard, New Processing Job, Meeting Minutes,
+  Actions, and All Processing.
+- Deep links survive browser refresh.
+- Dashboard uses bounded all-time database aggregates and recent-item queries.
+
+### Readable transcripts
+
+- Preserve Whisper segment start/end times and recognized text.
+- Render deterministic paragraphs using configurable silence, punctuation, and
+  length rules without inventing or removing recognized words.
+- Show paragraph-start timestamps in the viewer.
+- Provide a clean transcript download without timestamps.
+- Do not label formatting boundaries as speakers.
+
+### Meeting minutes
+
+- Provide a paginated library containing only jobs with persisted minutes.
+- Provide a deep-linked detail view containing meeting/source details, all
+  eight structured minutes sections, transcript access, downloads, and links to
+  independent actions with that meeting as provenance.
+- Completed meeting state and generated minutes remain immutable when actions
+  change.
+
+### Independent actions
+
+- Seed actions idempotently from generated minutes and backfill existing
+  generated minutes.
+- Permit manual actions with or without a meeting link.
+- Support `Open`, `InProgress`, `Blocked`, `Completed`, and `Cancelled` status.
+- Support description, optional assignee, optional due date, optional notes,
+  source, timestamps, optional meeting link, provenance snapshots, and an
+  opaque concurrency version.
+- Permit movement between statuses and hard deletion of any action after an
+  explicit confirmation.
+- Support server-side paging/filtering and CSV/JSON export.
+- Action changes never modify a meeting, processing job, or generated-minutes
+  snapshot.
 
 ## 6. Out of scope
 
-The following are not part of Phase 2:
-
 - Authentication, authorization, user ownership, and multi-tenancy.
-- Public or shared-network deployment.
-- AWS, Azure, or other cloud deployment.
-- S3/Blob storage, RDS, Step Functions, SQS, Lambda, or ECS implementations.
-- Video processing, live recording, and live transcription.
+- Public/shared-network or cloud deployment.
+- Direct Jira or other third-party connectors.
 - Speaker diarization or recognition.
-- Calendar, Teams, Zoom, and Google Meet integrations.
-- Email notifications, billing, mobile applications, and translation.
-- Cross-meeting semantic search or organizational knowledge graphs.
-
-All endpoints and the Hangfire dashboard remain unrestricted by design and must
-only be exposed in a trusted local environment.
+- LLM-based transcript polishing or correction.
+- PDF/DOCX transcript import.
+- Editing generated minutes.
+- Semantic search, notifications, live recording, live transcription, billing,
+  mobile applications, or translation.
+- Reprocessing a completed job into another mode.
+- Dashboard date filters or external telemetry.
 
 ## 7. User stories
 
-### Upload a meeting
+### Review the dashboard
 
-As a user, I want to upload a supported meeting recording so that processing
-can begin without blocking my browser.
+As a user, I want an accurate summary of all-time processing, recent work, and
+action workload so that I can decide where to go next.
 
-### Track processing
+### Choose a processing result
 
-As a user, I want to see status, stage, progress, duration, and useful failure
-information so that I understand what the system is doing.
+As a user, I want to choose transcript-only or full-meeting processing before I
+upload audio so that the system performs only the work I need.
 
-### Process a long meeting
+### Generate minutes from a transcript
 
-As a user, I want a long transcript to be summarized in bounded sections and
-aggregated into complete minutes instead of failing at the single-request
-limit.
+As a user, I want to upload an existing text or Markdown transcript so that I
+can receive minutes without audio transcoding or transcription.
 
-### Recover from a transient failure
+### Read a transcript
 
-As a user, I want temporary provider or network failures to retry automatically
-and exhausted or permanent failures to remain manually retryable when safe.
+As a user, I want paragraphs and timestamps so that a transcript is navigable
+without the formatter changing the recognized words.
 
-### Review history and results
+### Browse meeting records
 
-As a user, I want to page through prior jobs, view their transcript and minutes,
-and download both artifacts.
+As a user, I want a minutes-only library and stable detail links so that I can
+review completed meeting records independently of processing history.
 
-## 8. Product requirements
+### Manage independent actions
 
-- The API must return an accepted upload response after validation, storage,
-  persistence, and enqueueing; it must not perform the processing pipeline.
-- The Worker must execute the pipeline independently of the browser and API
-  request lifetime.
-- Transcription must run locally through Whisper.net behind
-  `ITranscriptionService`.
-- Minutes generation must use OpenAI GPT behind `IMeetingMinutesService`.
-- Output must include title, summary, attendees, discussion points, decisions,
-  action items, risks, and next steps.
-- Local paths, API keys, full transcripts, and sensitive AI payloads must not be
-  exposed in API responses or routine logs.
-- Automatic retry must be limited to classified transient failures and governed
-  by configuration.
-- Manual retry must remain available for failed or cancelled jobs without a new
-  upload.
-- Long-meeting processing must preserve structured information across chunks
-  and apply deterministic deduplication during aggregation.
-- Cleanup must never remove active-job artifacts or files outside the configured
-  storage root.
+As a user, I want generated actions to become standalone work records and to
+create additional actions so that work continues after the meeting is finished.
 
-## 9. Phase 2 success measures
+### Retain optional meeting context
 
-Phase 2 succeeds when:
+As a user, I want an action to link optionally to a meeting so that I can trace
+its origin without tying its lifecycle to that meeting.
 
-- The backend builds and all backend unit and integration tests pass.
-- Frontend lint, build, and automated tests pass.
-- Contract tests cover upload, status, history, result, download, and retry
-  behavior.
-- Worker tests cover normal completion, transient recovery, exhausted retry,
-  permanent failure, and manual retry.
-- Tests demonstrate both single-pass short transcripts and multi-pass long
-  transcripts producing the complete minutes schema.
-- Status and history expose duration using documented semantics, and the
-  frontend displays it.
-- A clean local setup can be configured without editing committed source files
-  or committing secrets or machine-specific absolute paths.
-- The documented end-to-end run verifies short audio, long audio, retry paths,
-  history, viewing, and downloads.
-- Durable documentation matches the released behavior.
+### Export actions
 
-The detailed work-package acceptance criteria live in
+As a user, I want selected or filtered actions in CSV or JSON so that I can
+transfer them to another system without MeetingMind claiming an integration.
+
+## 8. Product rules and measures
+
+### Dashboard definitions
+
+- Total jobs is the count of all persisted jobs.
+- Active count includes `Queued` and `Processing`.
+- Terminal counts show `Completed`, `Failed`, and `Cancelled` separately.
+- Success rate is `Completed / (Completed + Failed) * 100`.
+- `Cancelled`, `Queued`, and `Processing` are excluded from the success-rate
+  denominator. When the denominator is zero, display `—`.
+- Total audio processed is the sum of persisted source-audio duration for audio
+  jobs; transcript-upload jobs are excluded.
+- Average completed processing duration uses completed jobs with valid duration
+  data.
+- Transcript and minutes totals count persisted artifacts.
+- Action counts use the documented independent action statuses and UTC overdue
+  rule.
+- Dashboard returns five recent jobs and five recent minutes, newest first.
+
+### Action definitions
+
+- Due date is an optional UTC calendar date without a time.
+- An action is overdue when its due date is before the current UTC date and its
+  status is not `Completed` or `Cancelled`.
+- Deleting an action never edits its meeting or the generated-minutes JSON.
+- If retention deletes a linked meeting, the action remains, its live meeting
+  ID becomes null, and its meeting-title/source-filename provenance snapshot
+  remains.
+
+### Pagination
+
+- All Processing and Meeting Minutes use 20 items per page by default.
+- Actions uses 25 items per page by default.
+- API list requests permit at most 100 items.
+
+## 9. Phase 3 success measures
+
+Phase 3 succeeds when:
+
+- All three modes complete asynchronously and invoke only required providers.
+- Existing Phase 2 jobs and legacy upload clients remain usable.
+- Dashboard values agree with persisted acceptance data.
+- Representative transcripts have stable paragraphs/timestamps without word
+  changes or speaker claims.
+- Minutes are independently discoverable, immutable, and deep-linkable.
+- Generated and manual actions work independently with optional meeting links,
+  concurrency protection, filters, deletion confirmation, and safe exports.
+- Phase 2 upgrade/backfill and clean-database migrations both pass.
+- Backend/frontend tests, accessibility checks, and documented local
+  end-to-end scenarios pass.
+- Durable documents match released behavior.
+
+Detailed work-package gates and evidence are maintained in
 [`../BACKLOG.md`](../BACKLOG.md).
 
 ## 10. Risks and mitigations
 
 | Risk | Mitigation |
 | --- | --- |
-| Poor audio quality | Standardize audio through FFmpeg and document model limitations. |
-| Long transcript exceeds a model request | Use bounded chunks and hierarchical aggregation. |
-| Duplicate or conflicting chunk output | Use structured schemas, deterministic merge rules, and final aggregation. |
-| OpenAI or network interruption | Classify transient failures and apply configured retry/backoff. |
-| Automatic retry hides permanent errors | Do not automatically retry permanent failures; expose an actionable final state. |
-| Growing local storage | Apply configurable retention with active-job and root-boundary safeguards. |
-| Sensitive content reaches logs | Log identifiers and stages, not transcripts, secrets, paths, or full provider payloads. |
-| Local-only endpoints are exposed remotely | Document and retain the trusted-local boundary until authentication is delivered. |
+| Processing-mode branching duplicates workflow logic | Use one mode-aware Worker orchestration path and Application contracts. |
+| Transcript import bypasses media validation | Apply dedicated text extension, MIME, byte, UTF-8, binary, whitespace, and character validation. |
+| Formatting changes recognized meaning | Preserve structured segments and use deterministic formatting only. |
+| Paragraphs are mistaken for speakers | State explicitly that diarization is not present. |
+| Generated actions duplicate on retry/backfill | Use stable idempotency rules and database constraints. |
+| Action edit overwrites another edit | Require opaque version and return HTTP 409 for stale updates. |
+| Action deletion appears to alter minutes | Keep minutes immutable and require explicit action-delete confirmation. |
+| Meeting cleanup destroys independent work | Null the relationship and retain provenance snapshots before meeting removal. |
+| UTC overdue date surprises local users | Label due dates consistently and use the same UTC rule in API and UI. |
+| Dashboard queries grow with data | Use bounded aggregate/recent queries and supporting indexes. |
+| Local endpoints are exposed remotely | Retain and document the trusted-local boundary. |
 
 ## 11. Roadmap terminology
 
-- **Phase 1:** completed local MVP delivery cycle.
-- **Phase 2:** active local production-readiness and hardening delivery cycle.
-- **Future delivery cycles:** authentication, multi-user functionality, cloud
-  deployment, integrations, and meeting-intelligence expansion.
-
-Earlier drafts used “Phase 2” to mean AWS migration. That terminology is
-superseded by the Phase 2 planning decision dated 2026-07-15. The cloud mapping
-remains an architectural option, not an active commitment.
+- **Phase 1:** completed local MVP.
+- **Phase 2:** completed local production-readiness and hardening cycle.
+- **Phase 3:** active flexible-input, dashboard, transcript-readability,
+  minutes-library, and independent-actions cycle.
+- **Future cycles:** authentication, multi-user functionality, cloud deployment,
+  integrations, diarization, and meeting intelligence.

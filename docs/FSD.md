@@ -2,299 +2,375 @@
 
 **Product:** MeetingMind AI
 
-**Version:** 2.0
+**Version:** 3.0
 
-**Status:** Active Phase 2 specification
+**Status:** Active Phase 3 specification
 
-**Last reconciled with code:** 2026-07-17
+**Approved:** 2026-07-22
 
 ## 1. Purpose and boundary
 
-MeetingMind accepts a supported audio recording, creates a persistent job,
-processes it asynchronously, and makes a transcript and structured meeting
-minutes available for viewing and download.
+MeetingMind accepts supported audio or an existing UTF-8 transcript, creates a
+persistent asynchronous job, and produces the result selected by the user.
+Phase 3 adds dashboard/navigation, readable structured transcripts, a
+minutes-only library, and independent actions.
 
-Phase 2 remains a trusted local deployment. Authentication, user ownership,
-multi-tenancy, cloud infrastructure, and public access are excluded.
+The deployment remains trusted-local and unauthenticated. Meetings/minutes are
+completed immutable records. Actions are separate mutable records whose
+optional meeting link is provenance only.
 
-## 2. Runtime components
+## 2. Runtime components and constraints
 
-- React, TypeScript, Material UI, Axios, and Vite frontend.
-- ASP.NET Core Web API for upload, enqueueing, status, history, results,
-  downloads, retry, health checks, Swagger, and the local Hangfire dashboard.
-- A separate .NET Worker containing the Hangfire server and processing handler.
-- PostgreSQL for MeetingMind data and Hangfire storage.
-- Local filesystem storage behind `IFileStorageService`.
+- React, TypeScript, Material UI, Axios, and client-side routing frontend.
+- ASP.NET Core Web API for validation, enqueueing, reads, action commands,
+  exports, health, Swagger, and the local Hangfire dashboard.
+- Separate .NET Worker hosting Hangfire and long-running processing.
+- PostgreSQL via EF Core migrations.
+- Local filesystem through `IFileStorageService`.
 - FFmpeg behind `IAudioProcessingService`.
-- Local Whisper.net behind `ITranscriptionService`.
-- OpenAI GPT behind `IMeetingMinutesService`.
+- local Whisper.net behind `ITranscriptionService`.
+- OpenAI GPT behind `IMeetingMinutesService` and
+  `IMeetingMinutesGenerationClient`.
 
-The API never executes FFmpeg, Whisper, or GPT processing. The Worker never
-bypasses Application interfaces to reach infrastructure dependencies.
+Controllers contain no workflow/persistence/provider logic. The API never
+waits for FFmpeg, Whisper, or OpenAI. The Worker uses Application abstractions.
 
-## 3. Functional requirements
+## 3. Processing modes
 
-### FR-001 — Upload meeting
+| Mode | Accepted input | Required Worker operations | Available result |
+| --- | --- | --- | --- |
+| `TranscriptOnly` | MP3, WAV, M4A, AAC | validate checkpoint, FFmpeg, Whisper, format/save transcript | transcript |
+| `FullMeeting` | MP3, WAV, M4A, AAC | validate checkpoint, FFmpeg, Whisper, format/save transcript, generate/save minutes, seed actions | transcript and minutes |
+| `MinutesFromTranscript` | UTF-8 `.txt` or `.md` | validate stored transcript checkpoint, generate/save minutes, seed actions | uploaded transcript and minutes |
 
-The user can upload one MP3, WAV, M4A, or AAC audio file. The system validates
-filename safety, extension, MIME type, non-empty content, and configurable size
-before accepting it. Stored internal names are generated safely, and no local
-path is returned to the user.
+Every accepted request stores input, creates `MeetingJob`, enqueues through
+`IBackgroundJobService`, and returns HTTP 202. A mode never calls a provider it
+does not require. Reprocessing into another mode creates a new job.
 
-### FR-002 — Create and enqueue processing job
+## 4. Functional requirements
 
-After validation, the API saves the original audio, creates a `MeetingJob`,
-enqueues `ProcessMeetingAsync(jobId)` through `IBackgroundJobService`, stores
-the Hangfire job ID, and returns HTTP 202 with the MeetingMind job ID, status,
-and stage. It does not wait for processing.
+### FR-001 — Create an audio job
 
-### FR-003 — Background processing
+`POST /api/meetings/audio` accepts one supported audio file and a required mode
+of `TranscriptOnly` or `FullMeeting`. Validate non-empty content, safe filename,
+extension, MIME, and configured audio byte limit before enqueueing.
 
-The Worker executes this pipeline independently of the user session:
+`POST /api/meetings/upload` remains a deprecated compatibility alias that
+always creates `FullMeeting`. It retains the Phase 2 success response during
+Phase 3.
 
-1. Load and validate the persisted job and audio reference.
-2. Convert audio to PCM 16-bit, 16 kHz, mono WAV through FFmpeg.
-3. Generate a transcript locally through Whisper.net.
-4. Persist the transcript record and text artifact.
-5. Generate structured minutes through OpenAI GPT.
-6. Persist the minutes record and Markdown artifact.
-7. Mark the job completed.
+### FR-002 — Create a transcript job
 
-There is no separate transcript-cleanup stage. Application-layer long-meeting
-orchestration normalizes line endings only as part of bounded chunking; it is
-not an independent external processing provider.
+`POST /api/meetings/transcript` accepts one `.txt` or `.md` file and creates
+`MinutesFromTranscript`.
 
-### FR-004 — Job status and duration
+Validation must:
 
-Supported statuses are `Queued`, `Processing`, `Completed`, `Failed`, and
-`Cancelled`. Supported stages are `Uploaded`, `Validating`, `Transcoding`,
-`Transcribing`, `GeneratingMinutes`, `SavingResults`, `Completed`, and `Failed`.
+- Require a safe non-empty filename and allowed extension.
+- Accept documented plain-text/Markdown MIME values; reject incompatible
+  declared content types.
+- Reject empty, whitespace-only, binary/NUL-containing, or invalid UTF-8 input.
+- Reject content above configurable 10 MB before decoding.
+- Normalize CRLF/CR to LF and remove a UTF-8 BOM without changing other text.
+- Reject normalized content above configured `MaxTranscriptCharacters`
+  (default 1,200,000); never truncate.
+- Store the original validated text as a transcript checkpoint behind
+  `IFileStorageService` without exposing its path.
 
-Each job maintains progress from 0 to 100, current stage, a sanitized error
-when applicable, creation/update timestamps, and optional start/completion
-timestamps. Status and history expose `processingDurationSeconds` and
-`totalDurationSeconds` as non-negative whole numbers.
+### FR-003 — Mode-aware processing
 
-- Processing duration measures Worker execution. It is zero before the first
-  attempt starts, live from `StartedAt` while processing, and final at
-  `CompletedAt` for terminal jobs. A missing terminal completion falls back to
-  `UpdatedAt`; a missing start produces zero.
-- Total duration measures elapsed time from the original `CreatedAt`, including
-  queue time and manual retries. It is live for queued/processing jobs and final
-  for terminal jobs, using the same completion fallback.
-- Manual retry retains the previous attempt's final processing duration while
-  queued. The first transition into processing resets `StartedAt`, clears the
-  previous completion, and starts the new attempt at zero. Total duration never
-  resets because it remains anchored to the original upload.
-- Automatic retries preserve `StartedAt`, so processing duration remains live
-  through configured backoff and subsequent automatic attempts.
+The Worker dispatches by persisted mode and reports monotonic progress. Skipped
+providers/stages must not be presented as executed. Mode-invalid persisted
+input is a permanent safe failure.
 
-The frontend displays both values in history and processing details. The
-selected active job advances locally once per second between authoritative API
-polls.
+Retry reuses the most advanced valid mode-relevant durable checkpoint:
 
-### FR-005 — Audio transcoding
+- Audio modes: structured transcript, then processed audio, then original
+  audio.
+- Transcript mode: stored transcript.
 
-FFmpeg converts accepted input to the configured standard format before
-transcription. Conversion failures must identify the processing stage without
-exposing unsafe paths or raw command details to the frontend.
+The Phase 2 configured automatic/manual retry behavior remains in force.
 
-### FR-006 — Local transcription
+### FR-004 — Job status, mode, progress, and duration
 
-The Worker uses Whisper.net locally. Model size, model directory or explicit
-model path, automatic model download, and language are configurable. A missing
-model may be downloaded only when automatic download is enabled.
+Statuses remain `Queued`, `Processing`, `Completed`, `Failed`, and `Cancelled`.
+Existing stages remain valid. A new stage may be added only if the final SAD and
+implementation give it meaningful user-visible work; transcript import itself
+is validated/stored before enqueue and generation begins at
+`GeneratingMinutes` by default.
 
-### FR-007 — Structured meeting minutes
+Status/history expose mode, progress, sanitized error/retry data, timestamps,
+`processingDurationSeconds`, and `totalDurationSeconds`. Existing duration
+semantics remain unchanged.
 
-Minutes contain:
+Audio jobs persist nullable non-negative `sourceAudioDurationSeconds` after
+media inspection. Transcript jobs keep it null.
 
-- Title and executive summary.
-- Attendees, when identifiable.
-- Discussion points.
-- Decisions.
-- Action items with description and optional owner and due date.
-- Risks or blockers.
-- Next steps.
+### FR-005 — Structured readable transcription
 
-Short transcripts use one structured GPT request. Transcripts above the
-120,000-character single-pass threshold use sequential chunks of at most 60,000
-characters with up to 1,500 characters of overlap. Boundaries prefer paragraphs,
-sentences, whitespace, and a final hard bound. Transcripts above the configured
-1,200,000-character maximum fail permanently without truncation.
+`ITranscriptionService` returns provider-neutral ordered segments containing:
 
-Every chunk returns the complete minutes schema. Application orchestration
-normalizes and deterministically deduplicates strings case-insensitively while
-preserving order. Action items with matching normalized descriptions fill
-missing owner/due-date values; conflicting non-empty metadata remains separate.
-Bounded groups pass through sequential OpenAI aggregation tiers until one final
-result remains, with each serialized aggregation input limited to 120,000
-characters.
+- Non-negative start and end times with end not earlier than start.
+- Recognized text.
 
-Partial generation reports `GeneratingMinutes` progress from 60–85% and
-aggregation reports 86–89%. Transient partial or aggregation failures reach the
-configured Hangfire retry policy. A later attempt reuses the transcript but
-regenerates partials because partial minutes are not persisted.
+The formatter:
 
-### FR-008 — View and download results
+- Normalizes whitespace without changing recognized word content/order.
+- Combines short adjacent segments.
+- Starts a paragraph for a configured silence gap (default 1.5 seconds), or at
+  sentence-ending punctuation after a preferred size (default 300 characters),
+  or before exceeding a hard size (default 700 characters).
+- Is deterministic for identical segments/configuration.
+- Preserves paragraph start/end timing.
 
-For completed jobs, users can view structured minutes and transcript content
-and download a plain-text transcript and Markdown minutes artifact. Missing or
-not-yet-available results return a safe not-found response.
+Structured segments and formatting metadata are persisted as the durable
+source. The viewer shows paragraph-start timestamps. The plain-text download
+contains clean paragraphs without timestamps. Formatting never claims speaker
+identity. All configuration must be positive, internally valid, and validated
+at startup where consumed.
 
-### FR-009 — Retry failed processing
+### FR-006 — Structured minutes
 
-Manual retry remains available for `Failed` and `Cancelled` jobs and reuses the
-same MeetingMind job ID and original upload. It resets processing state and
-stores the new Hangfire job ID.
+Existing single-pass and long-transcript generation rules remain: complete
+schema, bounded chunking/aggregation, deterministic merging, safe maximum, and
+retry behavior.
 
-The Worker applies two configured automatic retries after the initial execution,
-using default delays of 10 and 60 seconds. Permanent failures are excluded from
-automatic retry. Unknown failures use the same bounded retry policy. A waiting
-retry is `Queued` at its last stage and progress with its safe error and retry
-metadata retained. Exhausted failures retain their final stage and sanitized
-error and remain eligible for manual retry when the original input is present.
-Manual retry resets the retry count and grants a fresh configured budget.
+Minutes contain title, summary, attendees, discussion points, decisions,
+generated action items, risks, and next steps. Persisted minutes and their JSON
+snapshot are immutable with respect to later independent action changes.
 
-### FR-010 — Processing history
+### FR-007 — Dashboard
 
-The API returns persisted jobs newest first with `skip` and bounded `take`
-pagination. History includes filename, status, stage, progress, sanitized error,
-retry metadata, timestamps, and Phase 2 duration. The frontend shows 20 jobs per
-page with boundary-aware Previous/Next controls. A selected active job remains
-visible and continues one non-overlapping polling loop when its history card is
-on another page.
+`GET /api/dashboard/summary` returns one bounded all-time summary:
 
-## 4. API contract
+- Total jobs and counts per processing mode.
+- Counts for `Completed`, `Failed`, `Cancelled`, and active
+  (`Queued` + `Processing`).
+- Success rate = `Completed / (Completed + Failed) * 100`; cancelled and active
+  jobs are excluded. Return null when denominator is zero.
+- Sum of `sourceAudioDurationSeconds` for audio jobs with known values.
+- Average processing duration for completed jobs with valid values.
+- Persisted transcript and minutes counts.
+- Independent action counts by status and overdue count.
+- Five recent jobs and five recent minutes, newest first.
 
-| Method | Endpoint | Successful response |
+The endpoint does not retrieve all history/actions and returns no local paths,
+transcript body, minutes body, or sensitive provider data.
+
+### FR-008 — Navigation and All Processing
+
+Dashboard is the default route. Routes exist for Dashboard, New Processing
+Job, Meeting Minutes, Meeting Detail, Actions, and All Processing. Direct links
+survive refresh.
+
+All Processing evolves existing history. It uses server paging, 20 items by
+default, maximum 100, newest-first ordering, mode display, active polling, and
+existing retry behavior.
+
+### FR-009 — Meeting-minutes library and detail
+
+`GET /api/meetings/minutes` returns only jobs with persisted minutes,
+newest-first, 20 per page by default and at most 100. Items include meeting/job
+ID, generated title, source filename, source type/mode, and processing
+timestamps.
+
+`GET /api/meetings/{jobId}/result` supplies the immutable meeting details and
+all eight structured sections. The view provides transcript/minutes downloads
+and read-only navigation to linked actions. Action state is never presented as
+meeting progress.
+
+### FR-010 — Independent action creation and provenance
+
+Minutes persistence seeds one independent action for every generated action
+item. Seeding and legacy backfill are idempotent and cannot duplicate a source
+item after retries or repeated backfill execution.
+
+`POST /api/actions` creates a `Manual` action with an optional valid meeting
+link. Generated actions use source `Generated` and their origin meeting.
+
+An action contains:
+
+- ID.
+- Required trimmed description, 1–2,000 characters.
+- Optional trimmed assignee, maximum 200 characters.
+- Optional notes, maximum 10,000 characters.
+- Optional due date represented as a UTC calendar date without time.
+- Status: `Open`, `InProgress`, `Blocked`, `Completed`, or `Cancelled`.
+- Source: `Generated` or `Manual`.
+- Optional live meeting ID.
+- Optional provenance meeting title and source filename snapshots.
+- Created, updated, optional completed timestamps.
+- Opaque concurrency `version`.
+
+Manual actions default to `Open`. Generated action description/owner/due-date
+map from the immutable minutes snapshot; unparseable generated due-date text may
+remain null in the tracked action while the original text remains in minutes.
+
+### FR-011 — Action queries, updates, links, and deletion
+
+`GET /api/actions` returns deterministic server-paged results, 25 by default
+and at most 100. Filters support status, assignee, due/overdue state, source,
+and live meeting ID. The documented default order is newest created first with
+ID as a stable tie-breaker.
+
+`GET /api/actions/{actionId}` returns one action and optional provenance.
+`GET /api/meetings/{jobId}/actions` returns actions currently linked to a
+meeting as read-only context.
+
+`PATCH /api/actions/{actionId}` may change description, assignee, notes, due
+date, status, and optional meeting link. It requires the opaque version from the
+latest DTO. A stale version returns HTTP 409 with a safe conflict code and the
+stored record remains unchanged.
+
+Any status may move to any other status. Entering `Completed` sets
+`CompletedAt` to the current time; leaving `Completed` clears it. Re-saving an
+already completed action does not replace its completion time unless it was
+first reopened.
+
+`DELETE /api/actions/{actionId}` permanently deletes a generated or manual
+action only after the UI obtains explicit user confirmation. The API performs
+the delete request directly and returns 204 for success; confirmation is a UI
+responsibility. Deletion never edits a meeting or generated-minutes JSON.
+
+Linking requires an existing meeting. Unlinking sets the live meeting ID to
+null and preserves provenance snapshots. Relinking refreshes snapshots from the
+new meeting.
+
+### FR-012 — Action overdue and retention behavior
+
+The system uses UTC date consistently. An action is overdue when:
+
+- `DueDate < current UTC date`, and
+- status is not `Completed` or `Cancelled`.
+
+When meeting retention deletes a linked meeting, it must atomically preserve or
+populate meeting-title/source-filename snapshots, set the action meeting ID to
+null, then delete meeting artifacts/records. No action cascades from meeting
+deletion. Deleting an action does not affect retention eligibility.
+
+### FR-013 — Action export
+
+`GET /api/actions/export?format=csv|json` exports selected IDs or the same
+documented filters as the action list. Selection/filter bounds must prevent
+unbounded memory use; implementation limits are finalized with P3-07 contracts.
+
+Exports include action fields, source, status, UTC due date, timestamps, and
+optional meeting/provenance context. CSV uses UTF-8 and correctly quotes commas,
+quotes, newlines, and Unicode. JSON uses a versioned provider-neutral schema.
+Exports contain no physical paths, secrets, credentials, or claim of Jira issue
+creation. `IActionItemExporter` is the Application boundary.
+
+### FR-014 — Backfill
+
+An idempotent, restart-safe backfill creates independent actions for existing
+minutes. It records enough source identity to prevent duplicates across partial
+runs, deployment retry, Worker retry, or later minutes reads. Backfill does not
+modify existing minutes JSON.
+
+## 5. API contract summary
+
+| Method | Endpoint | Success |
 | --- | --- | --- |
-| `POST` | `/api/meetings/upload` | `202 Accepted` with job ID, status, and stage |
-| `GET` | `/api/meetings/{jobId}/status` | Current status, stage, progress, error, and Phase 2 duration |
-| `GET` | `/api/meetings/history?skip=0&take=50` | Page metadata and newest-first history items |
-| `GET` | `/api/meetings/{jobId}/result` | Structured minutes for a completed job |
-| `GET` | `/api/meetings/{jobId}/transcript/download` | Plain-text transcript artifact |
-| `GET` | `/api/meetings/{jobId}/minutes/download` | Markdown minutes artifact |
-| `POST` | `/api/meetings/{jobId}/retry` | `202 Accepted` for an eligible manual retry |
-| `GET` | `/health` | API liveness |
-| `GET` | `/health/db` | PostgreSQL compatibility check |
-| `GET` | `/health/ready` | Aggregate PostgreSQL, storage-write, FFmpeg, and Whisper-model readiness |
+| `POST` | `/api/meetings/audio` | 202 with job ID, mode, status, stage |
+| `POST` | `/api/meetings/transcript` | 202 with job ID, mode, status, stage |
+| `POST` | `/api/meetings/upload` | 202; deprecated FullMeeting alias |
+| `GET` | `/api/meetings/{jobId}/status` | mode-aware status/progress/duration |
+| `GET` | `/api/meetings/history?skip=0&take=20` | All Processing page |
+| `GET` | `/api/dashboard/summary` | all-time aggregates and recent items |
+| `GET` | `/api/meetings/minutes?skip=0&take=20` | completed-minutes page |
+| `GET` | `/api/meetings/{jobId}/result` | immutable minutes and meeting details |
+| `GET` | `/api/meetings/{jobId}/transcript/download` | clean text transcript |
+| `GET` | `/api/meetings/{jobId}/minutes/download` | Markdown minutes |
+| `POST` | `/api/meetings/{jobId}/retry` | 202 for eligible mode-aware retry |
+| `GET` | `/api/actions` | filtered/paged independent actions |
+| `POST` | `/api/actions` | 201 with created manual action |
+| `GET` | `/api/actions/{actionId}` | one action |
+| `PATCH` | `/api/actions/{actionId}` | updated action with new version |
+| `DELETE` | `/api/actions/{actionId}` | 204 |
+| `GET` | `/api/meetings/{jobId}/actions` | linked action context |
+| `GET` | `/api/actions/export?format=csv|json` | export download |
 
-Unknown jobs return 404. Invalid uploads return 400. A retry of a job whose
-status is not retryable returns 409.
+Common responses: 400 invalid request, 404 unknown resource, 409 invalid state
+or stale action version, 413 byte-size limit, 415 unsupported media type, and
+safe 500-class responses for unexpected failure. Exact safe codes are stable
+Application/API contracts and must be tested.
 
-## 5. Persistence model
+## 6. Persistence requirements
 
-### MeetingJob
+### MeetingJob additions
 
-`Id`, `OriginalFileName`, `OriginalFilePath`, `ProcessedFilePath`, `Status`,
-`Stage`, `Progress`, `ErrorCode`, `ErrorMessage`, `HangfireJobId`, `AutomaticRetryCount`,
-`AutomaticRetryLimit`, `NextRetryAt`, `CreatedAt`, `StartedAt`, `CompletedAt`,
-and `UpdatedAt`.
+- `ProcessingMode` (required; existing rows migrate to `FullMeeting`).
+- Approved source/input metadata and nullable mode-valid paths.
+- Nullable `SourceAudioDurationSeconds`.
 
-### MeetingTranscript
+### MeetingTranscript additions
 
-One transcript per job: `Id`, `MeetingJobId`, `TranscriptText`,
-`TranscriptFilePath`, and `CreatedAt`.
+- Structured provider-neutral segments and formatting version/configuration, or
+  an equivalent normalized child model selected in SAD/implementation.
+- Existing transcript text/path remain available for result/download
+  compatibility.
 
-### MeetingMinutes
+### Action
 
-One minutes record per job: `Id`, `MeetingJobId`, `Title`, `Summary`,
-`DecisionsJson`, `ActionItemsJson`, `RisksJson`, `NextStepsJson`,
-`FullMinutesJson`, `MinutesFilePath`, and `CreatedAt`.
+Independent table with the FR-010 fields. Meeting foreign key is nullable and
+uses set-null/non-cascade behavior. Database constraints/indexes support
+required lengths/status/source, stable generation identity, filters, overdue
+queries, meeting context, and newest-first paging. Concurrency uses a storage
+token encoded as an opaque DTO value.
 
-Stored file references are relative to the configured storage root. Physical
-paths are infrastructure details and must not enter frontend contracts.
-
-## 6. Error and retry behavior
-
-The system distinguishes:
-
-- Validation or permanent failures, such as unsupported input, corrupted audio,
-  missing stored input, or invalid configuration.
-- Transient failures, such as eligible timeouts, rate limiting, temporary
-  network interruption, or transient persistence/provider faults.
-
-Every final failure records job status, stage, progress, a stable error code,
-and a bounded safe message. Structured logs record job ID, stage, outcome,
-attempt, progress, failure classification, exception type, and elapsed time.
-They do not record raw exception messages/objects, full transcripts, secrets,
-provider payloads, or physical paths. Exceptions returned to Hangfire are also
-replaced with safe code/message exceptions.
-
-Temporary storage I/O, FFmpeg/Whisper interruptions, retryable OpenAI responses,
-network timeouts, and transient persistence faults are eligible for automatic
-retry. Missing or corrupt inputs, unsafe paths, access/capacity failures,
-invalid configuration, unsupported media, provider authentication/validation
-failures, malformed AI output, and non-transient persistence failures are
-permanent. Unclassified exceptions are treated as transient but remain bounded
-by the configured two-retry limit.
-
-Before repeating work, the Worker validates and reuses the latest durable
-checkpoint: a stored transcript first, otherwise processed audio. Invalid or
-missing checkpoint artifacts fall back to the nearest safe earlier stage.
+Physical file references remain relative and never enter frontend contracts.
 
 ## 7. Non-functional requirements
 
 ### Performance
 
-- The upload request performs validation, storage, persistence, and enqueueing
-  only; no long-running media or AI processing occurs in the request.
-- The frontend polls active jobs without creating overlapping polling loops.
-- Chunk and aggregation sizes are configurable and bounded.
+- Creation requests perform bounded validation/storage/persistence/enqueue only.
+- Dashboard uses database aggregates and bounded recent queries.
+- All lists are server-paged and capped at 100.
+- Exports are bounded and do not load unlimited actions.
+- Frontend polling remains non-overlapping.
 
 ### Reliability
 
-- A successful upload is not lost when the browser closes.
-- Status transitions and persisted artifacts remain internally consistent.
-- Automatic retry is bounded and limited to transient failures.
-- Cleanup never removes active-job data.
-- Retention is disabled by default and configurable by enabled state, terminal
-  age, daily Hangfire schedule, and bounded batch size. Only terminal jobs with
-  no scheduled retry qualify. A PostgreSQL row lock protects the eligibility
-  check through artifact and cascading record deletion. All paths are
-  prevalidated within the storage root and reparse-point traversal is rejected.
-- Readiness returns only dependency names and healthy/unhealthy states. It
-  queries PostgreSQL, performs an in-root zero-byte write/delete probe, verifies
-  FFmpeg, and opens the configured Whisper model for reading.
+- Accepted jobs survive browser closure.
+- Retry/checkpoints are mode-aware and provider-minimal.
+- Action seeding/backfill is idempotent.
+- Action updates are optimistic-concurrency safe.
+- Meeting retention never deletes independent actions.
+- Existing safe retention, retry, readiness, and logging rules remain.
 
 ### Security and privacy
 
-- Validate extension, MIME type, size, and filename safety.
-- Prevent path traversal and storage-root escape.
-- Keep secrets outside committed configuration.
-- Do not expose local paths or sensitive diagnostic details.
-- Keep the application and Hangfire dashboard on a trusted local machine.
+- Validate every audio/text upload and prevent traversal/root escape.
+- Do not expose transcripts in logs, secrets, provider payloads, or local paths.
+- Treat CSV cells as data and mitigate formula injection for values beginning
+  with spreadsheet formula control characters.
+- Keep the application restricted to a trusted local machine.
 
-### Maintainability
+### Accessibility
 
-- Domain has no infrastructure dependencies.
-- Application defines use cases and infrastructure interfaces.
-- Infrastructure implements persistence, storage, media, transcription, and
-  GPT integrations.
-- API and Worker are separate entry points and remain thin composition and
-  delivery layers.
+- All routes, forms, filters, paging, confirmations, conflicts, progress, empty,
+  and error states are keyboard operable and labelled.
+- Use deliberate focus movement and a single polite live-status strategy.
+- Automated scans fail on serious/critical violations; manual contrast and
+  responsive checks remain required.
 
 ## 8. Verification requirements
 
-- Unit tests cover domain and Application behavior.
-- API contract tests cover successful and invalid request paths.
-- PostgreSQL integration tests verify persistence and retry state transitions.
-- Worker tests use test doubles for FFmpeg, Whisper, OpenAI, and storage.
-- Frontend tests cover upload, non-overlapping polling, paginated history,
-  off-page selection, results, duration, retry state, focus, and responsive
-  selection behavior. Axe scans fail on serious or critical violations in the
-  primary empty, active, completed, failed, and paginated states; color contrast
-  remains a manual browser check because jsdom has no layout model.
-- Real provider and media dependencies are used only in the documented local
-  end-to-end acceptance run.
+- Unit tests cover mode rules, formatting, metrics, action validation/status,
+  overdue UTC logic, concurrency mapping, and export escaping.
+- API tests cover every endpoint, validation boundary, paging/filtering,
+  compatibility alias, conflicts, deletion, and safe errors.
+- PostgreSQL tests cover migrations, indexes/constraints, set-null retention,
+  concurrency, seeding, and idempotent backfill.
+- Worker tests prove each mode calls only required providers and reuses correct
+  checkpoints through retries.
+- Frontend tests cover routes/refresh, modes, dashboard, minutes library/detail,
+  actions, delete confirmation, conflicts, filters, exports, accessibility, and
+  non-overlapping polling.
+- Local acceptance covers all modes, representative structured transcription,
+  dashboard truth, immutable meetings, independent actions, export, Phase 2
+  upgrade/backfill, and clean database creation.
 
-Measurable acceptance criteria for each Phase 2 work package are maintained in
+Measurable package criteria and evidence live in
 [`../BACKLOG.md`](../BACKLOG.md).
-
-## 9. Future enhancements
-
-Authentication, user ownership, multi-tenancy, cloud hosting, cloud storage and
-orchestration, speaker diarization, meeting integrations, notifications,
-multiple providers, and meeting-intelligence features are deferred to future
-delivery cycles.
