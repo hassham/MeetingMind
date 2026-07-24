@@ -27,6 +27,7 @@ public class MeetingStatusService : IMeetingStatusService
 
         return new MeetingJobStatusResult(
             meetingJob.Id,
+            meetingJob.ProcessingMode.ToString(),
             meetingJob.Status.ToString(),
             meetingJob.Stage.ToString(),
             meetingJob.Progress,
@@ -35,6 +36,7 @@ public class MeetingStatusService : IMeetingStatusService
             meetingJob.AutomaticRetryCount,
             meetingJob.AutomaticRetryLimit,
             meetingJob.NextRetryAt,
+            meetingJob.SourceAudioDurationSeconds,
             duration.ProcessingDurationSeconds,
             duration.TotalDurationSeconds);
     }

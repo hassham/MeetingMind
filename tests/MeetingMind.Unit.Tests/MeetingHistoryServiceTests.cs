@@ -19,6 +19,8 @@ public class MeetingHistoryServiceTests
                 {
                     Id = jobId,
                     OriginalFileName = "meeting.mp3",
+                    ProcessingMode = MeetingProcessingMode.TranscriptOnly,
+                    SourceAudioDurationSeconds = 120,
                     Status = MeetingJobStatus.Failed,
                     Stage = MeetingJobStage.GeneratingMinutes,
                     Progress = 60,
@@ -43,6 +45,8 @@ public class MeetingHistoryServiceTests
         Assert.Single(result.Items);
         Assert.Equal(jobId, result.Items[0].JobId);
         Assert.Equal("meeting.mp3", result.Items[0].OriginalFileName);
+        Assert.Equal("TranscriptOnly", result.Items[0].ProcessingMode);
+        Assert.Equal(120, result.Items[0].SourceAudioDurationSeconds);
         Assert.Equal("Failed", result.Items[0].Status);
         Assert.Equal("GeneratingMinutes", result.Items[0].Stage);
         Assert.Equal(2, result.Items[0].AutomaticRetryCount);

@@ -17,9 +17,8 @@ Last updated: 2026-07-22.
 **Theme:** Flexible meeting inputs, useful dashboards, readable transcripts,
 and independently trackable actions.
 
-**Overall status:** `IN PROGRESS` — P3-01 requirements and contract
-reconciliation completed on 2026-07-22. P3-02 is next and has not started. No
-Phase 3 production code or database migration has been implemented yet.
+**Overall status:** `IN PROGRESS` — P3-02 mode-aware jobs and safe migration
+completed on 2026-07-22. P3-03 is next and has not started.
 
 ### Phase 3 outcome
 
@@ -106,9 +105,9 @@ Additional tracking rules:
 
 ## Current focus
 
-P3-01 is complete. The next work package is P3-02, which must begin with its own
-`WORKFLOW.md` Discovery Report and confirmation before production code or an EF
-Core migration is written.
+P3-02 is complete. P3-03 is next and must begin with its own `WORKFLOW.md`
+Discovery Report and confirmation before new upload endpoints or frontend
+workflow changes are implemented.
 
 ### P3-01 — Reconcile Phase 3 requirements, UX, and contracts
 
@@ -197,28 +196,31 @@ Notes:
 
 ### P3-02 — Introduce mode-aware jobs and safe migrations
 
-**Status:** `TODO`
+**Status:** `DONE`
 
 **Depends on:** P3-01.
-**Completion:** Not started.
 
-- [ ] Add `MeetingProcessingMode`: `TranscriptOnly`, `FullMeeting`, and
+**Started:** 2026-07-22.
+
+**Completed:** 2026-07-22.
+
+- [x] Add `MeetingProcessingMode`: `TranscriptOnly`, `FullMeeting`, and
       `MinutesFromTranscript`.
-- [ ] Add approved mode/source metadata and mode-valid input rules to
+- [x] Add approved mode/source metadata and mode-valid input rules to
       `MeetingJob`.
-- [ ] Make audio-specific fields nullable only where required and enforce valid
+- [x] Make audio-specific fields nullable only where required and enforce valid
       combinations in Domain/Application and database constraints where
       practical.
-- [ ] Add EF Core migration and indexes for processing mode and the approved
+- [x] Add EF Core migration and indexes for processing mode and the approved
       query patterns.
-- [ ] Migrate every existing job to `FullMeeting` without altering artifacts,
+- [x] Migrate every existing job to `FullMeeting` without altering artifacts,
       timestamps, status, retry eligibility, or results.
-- [ ] Update status/history Application and API contracts to expose mode safely.
-- [ ] Make retry and durable-checkpoint rules mode-aware.
-- [ ] Update retention eligibility/path handling for mode-specific inputs.
-- [ ] Add Domain, Application, repository, migration, API contract, and Worker
+- [x] Update status/history Application and API contracts to expose mode safely.
+- [x] Make retry and durable-checkpoint rules mode-aware.
+- [x] Update retention eligibility/path handling for mode-specific inputs.
+- [x] Add Domain, Application, repository, migration, API contract, and Worker
       regression tests.
-- [ ] Run the complete existing backend and frontend regression suites.
+- [x] Run the complete existing backend and frontend regression suites.
 
 Acceptance criteria:
 
@@ -230,7 +232,37 @@ Acceptance criteria:
   clean database successfully.
 - Mode-specific jobs never require an irrelevant audio or transcript path.
 
-Evidence: Pending.
+Evidence:
+
+- Decision record:
+  [`docs/archive/phase3/QUESTIONS_p3_02_mode_aware_jobs_migration.md`](docs/archive/phase3/QUESTIONS_p3_02_mode_aware_jobs_migration.md).
+- Migration `20260722021323_AddProcessingModeAndAudioDuration` adds the required
+  string mode with `FullMeeting` backfill/default, nullable whole-second audio
+  duration, three check constraints, and three approved indexes.
+- `dotnet build MeetingMind.sln -c Release --no-restore` passed with zero
+  warnings and errors. Release output was used because the developer's running
+  Debug API/Worker processes held Debug assemblies open.
+- `dotnet test MeetingMind.sln -c Release --no-build --no-restore` passed 99
+  backend tests: 39 unit, 34 Worker, 17 Infrastructure integration, and 9 API
+  integration.
+- PostgreSQL tests applied migrations to a clean database and upgraded a schema
+  stopped at `20260719045819_AddSafeErrorCode`; the legacy row retained its data
+  and received `FullMeeting` plus null audio duration.
+- `npm.cmd run lint`, `npm.cmd test -- --run` (19 tests), and
+  `npm.cmd run build` passed.
+- `git diff --check` passed.
+
+Notes:
+
+- Existing input field names remain generic source fields. Audio duration is
+  nullable `long` seconds. Mode persists as a constrained readable string.
+- Worker tests prove FullMeeting retains its pipeline, TranscriptOnly skips
+  minutes, and MinutesFromTranscript skips FFmpeg/Whisper and requires a valid
+  transcript checkpoint.
+- Retention labels transcript sources correctly, ignores irrelevant processed
+  audio, and deletes a duplicated source/transcript path only once.
+- P3-03 remains `TODO`; no new creation endpoint, transcript upload validation,
+  or frontend workflow selector was added.
 
 ### P3-03 — Deliver all three creation workflows
 

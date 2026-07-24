@@ -1,4 +1,5 @@
 using MeetingMind.Domain.Entities;
+using MeetingMind.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace MeetingMind.Infrastructure.Persistence
@@ -22,10 +23,28 @@ namespace MeetingMind.Infrastructure.Persistence
 
             modelBuilder.Entity<MeetingJob>(entity =>
             {
+                entity.ToTable(table =>
+                {
+                    table.HasCheckConstraint(
+                        "CK_MeetingJobs_ProcessingMode",
+                        "\"ProcessingMode\" IN ('TranscriptOnly', 'FullMeeting', 'MinutesFromTranscript')");
+                    table.HasCheckConstraint(
+                        "CK_MeetingJobs_SourceAudioDurationSeconds",
+                        "\"SourceAudioDurationSeconds\" IS NULL OR \"SourceAudioDurationSeconds\" >= 0");
+                    table.HasCheckConstraint(
+                        "CK_MeetingJobs_TranscriptInputAudioMetadata",
+                        "\"ProcessingMode\" <> 'MinutesFromTranscript' OR (\"ProcessedFilePath\" IS NULL AND \"SourceAudioDurationSeconds\" IS NULL)");
+                });
                 entity.HasKey(job => job.Id);
                 entity.Property(job => job.OriginalFileName).HasMaxLength(255).IsRequired();
                 entity.Property(job => job.OriginalFilePath).HasMaxLength(1024).IsRequired();
                 entity.Property(job => job.ProcessedFilePath).HasMaxLength(1024);
+                entity.Property(job => job.ProcessingMode)
+                    .HasConversion<string>()
+                    .HasMaxLength(32)
+                    .HasDefaultValue(MeetingProcessingMode.FullMeeting)
+                    .HasSentinel((MeetingProcessingMode)(-1))
+                    .IsRequired();
                 entity.Property(job => job.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
                 entity.Property(job => job.Stage).HasConversion<string>().HasMaxLength(64).IsRequired();
                 entity.Property(job => job.ErrorMessage).HasMaxLength(4000);
@@ -36,6 +55,15 @@ namespace MeetingMind.Infrastructure.Persistence
                 entity.Property(job => job.AutomaticRetryLimit).IsRequired();
                 entity.Property(job => job.CreatedAt).IsRequired();
                 entity.Property(job => job.UpdatedAt).IsRequired();
+                entity.HasIndex(job => new { job.CreatedAt, job.Id })
+                    .IsDescending()
+                    .HasDatabaseName("IX_MeetingJobs_CreatedAt_Id");
+                entity.HasIndex(job => new { job.Status, job.CreatedAt })
+                    .IsDescending(false, true)
+                    .HasDatabaseName("IX_MeetingJobs_Status_CreatedAt");
+                entity.HasIndex(job => new { job.ProcessingMode, job.CreatedAt })
+                    .IsDescending(false, true)
+                    .HasDatabaseName("IX_MeetingJobs_ProcessingMode_CreatedAt");
 
                 entity.HasOne(job => job.Transcript)
                     .WithOne(transcript => transcript.MeetingJob)

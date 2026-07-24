@@ -66,6 +66,8 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
 
         var status = await _factory.Client.GetFromJsonAsync<JsonElement>($"/api/meetings/{jobId}/status");
         Assert.Equal(jobId, status.GetProperty("jobId").GetGuid());
+        Assert.Equal("FullMeeting", status.GetProperty("processingMode").GetString());
+        Assert.Equal(JsonValueKind.Null, status.GetProperty("sourceAudioDurationSeconds").ValueKind);
         Assert.Equal("Queued", status.GetProperty("status").GetString());
     }
 
@@ -98,6 +100,8 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
         job.NextRetryAt = now.AddSeconds(60);
         job.ErrorCode = "temporary_interruption";
         job.ErrorMessage = "A temporary interruption stopped processing.";
+        job.ProcessingMode = MeetingProcessingMode.TranscriptOnly;
+        job.SourceAudioDurationSeconds = 75;
         await _factory.SeedAsync(job);
 
         var response = await _factory.Client.GetAsync($"/api/meetings/{job.Id}/status");
@@ -106,6 +110,8 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Processing", json.RootElement.GetProperty("status").GetString());
+        Assert.Equal("TranscriptOnly", json.RootElement.GetProperty("processingMode").GetString());
+        Assert.Equal(75, json.RootElement.GetProperty("sourceAudioDurationSeconds").GetInt64());
         Assert.Equal("Transcribing", json.RootElement.GetProperty("stage").GetString());
         Assert.Equal(25, json.RootElement.GetProperty("progress").GetInt32());
         Assert.Equal("temporary_interruption", json.RootElement.GetProperty("errorCode").GetString());
@@ -143,6 +149,8 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
         Assert.Equal(1, json.RootElement.GetProperty("take").GetInt32());
         Assert.Equal(2, json.RootElement.GetProperty("total").GetInt32());
         Assert.Equal(newer.Id, items[0].GetProperty("jobId").GetGuid());
+        Assert.Equal("FullMeeting", items[0].GetProperty("processingMode").GetString());
+        Assert.Equal(JsonValueKind.Null, items[0].GetProperty("sourceAudioDurationSeconds").ValueKind);
         Assert.Equal(1, items[0].GetProperty("automaticRetryCount").GetInt32());
         Assert.Equal(2, items[0].GetProperty("automaticRetryLimit").GetInt32());
         Assert.Equal(JsonValueKind.Null, items[0].GetProperty("nextRetryAt").ValueKind);

@@ -53,6 +53,7 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         return await _dbContext.MeetingJobs
             .AsNoTracking()
             .OrderByDescending(meetingJob => meetingJob.CreatedAt)
+            .ThenByDescending(meetingJob => meetingJob.Id)
             .Skip(skip)
             .Take(take)
             .ToArrayAsync(cancellationToken);
@@ -162,7 +163,7 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         var now = DateTimeOffset.UtcNow;
 
         meetingJob.Status = MeetingJobStatus.Queued;
-        meetingJob.Stage = MeetingJobStage.Uploaded;
+        meetingJob.Stage = meetingJob.ProcessingMode.InitialStage();
         meetingJob.Progress = 0;
         meetingJob.ErrorMessage = null;
         meetingJob.ErrorCode = null;

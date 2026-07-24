@@ -49,6 +49,7 @@ public class MeetingHistoryService : IMeetingHistoryService
         return new MeetingHistoryItem(
             item.Id,
             item.OriginalFileName,
+            item.ProcessingMode.ToString(),
             item.Status.ToString(),
             item.Stage.ToString(),
             item.Progress,
@@ -61,6 +62,7 @@ public class MeetingHistoryService : IMeetingHistoryService
             item.UpdatedAt,
             item.StartedAt,
             item.CompletedAt,
+            item.SourceAudioDurationSeconds,
             duration.ProcessingDurationSeconds,
             duration.TotalDurationSeconds);
     }

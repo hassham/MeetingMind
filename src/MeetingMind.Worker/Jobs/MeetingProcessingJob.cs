@@ -69,6 +69,7 @@ public class MeetingProcessingJob : IMeetingProcessingJob
             }
 
             attemptNumber = meetingJob.AutomaticRetryCount + 1;
+            ValidateModeInput(meetingJob);
             LogStageOutcome(
                 LogLevel.Information,
                 jobId,
@@ -92,6 +93,12 @@ public class MeetingProcessingJob : IMeetingProcessingJob
                 attemptNumber,
                 stageStarted);
 
+            if (!meetingJob.ProcessingMode.RequiresAudio())
+            {
+                currentStage = MeetingJobStage.GeneratingMinutes;
+                currentProgress = 60;
+            }
+
             var transcript = await GetValidTranscriptCheckpointAsync(jobId);
             string transcriptText;
 
@@ -107,7 +114,7 @@ public class MeetingProcessingJob : IMeetingProcessingJob
                     attemptNumber,
                     _timeProvider.GetTimestamp());
             }
-            else
+            else if (meetingJob.ProcessingMode.RequiresAudio())
             {
                 var processedFilePath = await GetOrCreateProcessedAudioAsync(
                     meetingJob,
@@ -150,6 +157,17 @@ public class MeetingProcessingJob : IMeetingProcessingJob
                     60,
                     attemptNumber,
                     stageStarted);
+            }
+            else
+            {
+                throw new PermanentMeetingProcessingException(
+                    "A valid stored transcript is required for transcript-input processing.");
+            }
+
+            if (!meetingJob.ProcessingMode.GeneratesMinutes())
+            {
+                await CompleteAsync(jobId, attemptNumber, attemptStarted);
+                return;
             }
 
             currentStage = MeetingJobStage.GeneratingMinutes;
@@ -227,22 +245,7 @@ public class MeetingProcessingJob : IMeetingProcessingJob
                 attemptNumber,
                 stageStarted);
 
-            await _meetingJobRepository.UpdateStatusAsync(
-                jobId,
-                MeetingJobStatus.Completed,
-                MeetingJobStage.Completed,
-                progress: 100,
-                errorMessage: null,
-                CancellationToken.None);
-
-            LogStageOutcome(
-                LogLevel.Information,
-                jobId,
-                MeetingJobStage.Completed,
-                "Succeeded",
-                100,
-                attemptNumber,
-                attemptStarted);
+            await CompleteAsync(jobId, attemptNumber, attemptStarted);
         }
         catch (Exception exception)
         {
@@ -345,6 +348,40 @@ public class MeetingProcessingJob : IMeetingProcessingJob
 
             throw CreateSafeException(classification);
         }
+    }
+
+    private static void ValidateModeInput(MeetingJob meetingJob)
+    {
+        try
+        {
+            meetingJob.ValidateModeInput();
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new PermanentMeetingProcessingException(
+                "The meeting job contains input that is invalid for its processing mode.",
+                exception);
+        }
+    }
+
+    private async Task CompleteAsync(Guid jobId, int attemptNumber, long attemptStarted)
+    {
+        await _meetingJobRepository.UpdateStatusAsync(
+            jobId,
+            MeetingJobStatus.Completed,
+            MeetingJobStage.Completed,
+            progress: 100,
+            errorMessage: null,
+            CancellationToken.None);
+
+        LogStageOutcome(
+            LogLevel.Information,
+            jobId,
+            MeetingJobStage.Completed,
+            "Succeeded",
+            100,
+            attemptNumber,
+            attemptStarted);
     }
 
     private async Task<MeetingTranscript?> GetValidTranscriptCheckpointAsync(Guid jobId)

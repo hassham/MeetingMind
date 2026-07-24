@@ -53,6 +53,7 @@ public sealed class EfStorageRetentionRepository : IStorageRetentionRepository
         var candidate = new StorageRetentionCandidate(
             job.Id,
             job.Status,
+            job.ProcessingMode,
             job.CompletedAt ?? job.UpdatedAt,
             job.OriginalFilePath,
             job.ProcessedFilePath,

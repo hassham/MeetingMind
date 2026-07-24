@@ -1,6 +1,7 @@
 using MeetingMind.Application.Common.Interfaces;
 using MeetingMind.Application.Common.Options;
 using MeetingMind.Application.Common.Retention;
+using MeetingMind.Domain.Enums;
 
 namespace MeetingMind.Application.Operations;
 
@@ -99,13 +100,21 @@ public sealed class StorageRetentionService : IStorageRetentionService
     {
         var artifacts = new List<(string Type, string Path)>
         {
-            ("original_audio", candidate.OriginalFilePath)
+            (candidate.ProcessingMode == MeetingProcessingMode.MinutesFromTranscript
+                ? "source_transcript"
+                : "original_audio", candidate.OriginalFilePath)
         };
 
-        AddIfPresent(artifacts, "processed_audio", candidate.ProcessedFilePath);
+        if (candidate.ProcessingMode.RequiresAudio())
+        {
+            AddIfPresent(artifacts, "processed_audio", candidate.ProcessedFilePath);
+        }
         AddIfPresent(artifacts, "transcript", candidate.TranscriptFilePath);
         AddIfPresent(artifacts, "minutes", candidate.MinutesFilePath);
-        return artifacts;
+        return artifacts
+            .GroupBy(artifact => artifact.Path, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToArray();
     }
 
     private static void AddIfPresent(

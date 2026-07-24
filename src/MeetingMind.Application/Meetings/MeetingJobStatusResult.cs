@@ -2,6 +2,7 @@ namespace MeetingMind.Application.Meetings;
 
 public sealed record MeetingJobStatusResult(
     Guid JobId,
+    string ProcessingMode,
     string Status,
     string Stage,
     int Progress,
@@ -10,5 +11,6 @@ public sealed record MeetingJobStatusResult(
     int AutomaticRetryCount,
     int AutomaticRetryLimit,
     DateTimeOffset? NextRetryAt,
+    long? SourceAudioDurationSeconds,
     long ProcessingDurationSeconds,
     long TotalDurationSeconds);

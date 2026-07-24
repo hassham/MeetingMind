@@ -43,6 +43,27 @@ public sealed class StorageRetentionServiceTests
     }
 
     [Fact]
+    public async Task TranscriptInputDeletesItsSourceOnceAndIgnoresProcessedAudio()
+    {
+        var sourcePath = "Transcript/imported.txt";
+        var candidate = CreateCandidate() with
+        {
+            ProcessingMode = MeetingProcessingMode.MinutesFromTranscript,
+            OriginalFilePath = sourcePath,
+            ProcessedFilePath = "Audio/Processed/irrelevant.wav",
+            TranscriptFilePath = sourcePath
+        };
+        var repository = new StubRetentionRepository(candidate);
+        var storage = new StubStorage();
+        var service = CreateService(repository, storage);
+
+        var result = await service.CleanupAsync(CancellationToken.None);
+
+        Assert.Equal(1, result.Deleted);
+        Assert.Equal([sourcePath, candidate.MinutesFilePath], storage.DeletedPaths);
+    }
+
+    [Fact]
     public async Task JobThatBecomesActiveDuringRevalidationIsNeverTouched()
     {
         var repository = new StubRetentionRepository(CreateCandidate())
@@ -112,6 +133,7 @@ public sealed class StorageRetentionServiceTests
         return new StorageRetentionCandidate(
             Guid.NewGuid(),
             MeetingJobStatus.Completed,
+            MeetingProcessingMode.FullMeeting,
             Now.AddDays(-31),
             "Audio/Original/original.mp3",
             "Audio/Processed/processed.wav",

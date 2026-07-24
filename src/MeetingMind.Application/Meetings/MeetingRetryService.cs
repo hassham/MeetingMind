@@ -46,6 +46,6 @@ public class MeetingRetryService : IMeetingRetryService
         return new MeetingRetryResult(
             meetingJobId,
             MeetingJobStatus.Queued.ToString(),
-            MeetingJobStage.Uploaded.ToString());
+            meetingJob.ProcessingMode.InitialStage().ToString());
     }
 }

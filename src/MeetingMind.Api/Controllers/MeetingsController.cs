@@ -79,6 +79,7 @@ public class MeetingsController : ControllerBase
         return Ok(new
         {
             jobId = result.JobId,
+            processingMode = result.ProcessingMode,
             status = result.Status,
             stage = result.Stage,
             progress = result.Progress,
@@ -87,6 +88,7 @@ public class MeetingsController : ControllerBase
             automaticRetryCount = result.AutomaticRetryCount,
             automaticRetryLimit = result.AutomaticRetryLimit,
             nextRetryAt = result.NextRetryAt,
+            sourceAudioDurationSeconds = result.SourceAudioDurationSeconds,
             processingDurationSeconds = result.ProcessingDurationSeconds,
             totalDurationSeconds = result.TotalDurationSeconds
         });
@@ -109,6 +111,7 @@ public class MeetingsController : ControllerBase
             {
                 jobId = item.JobId,
                 originalFileName = item.OriginalFileName,
+                processingMode = item.ProcessingMode,
                 status = item.Status,
                 stage = item.Stage,
                 progress = item.Progress,
@@ -121,6 +124,7 @@ public class MeetingsController : ControllerBase
                 updatedAt = item.UpdatedAt,
                 startedAt = item.StartedAt,
                 completedAt = item.CompletedAt,
+                sourceAudioDurationSeconds = item.SourceAudioDurationSeconds,
                 processingDurationSeconds = item.ProcessingDurationSeconds,
                 totalDurationSeconds = item.TotalDurationSeconds
             })

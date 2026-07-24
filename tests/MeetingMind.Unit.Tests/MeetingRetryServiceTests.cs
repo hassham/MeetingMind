@@ -38,6 +38,27 @@ public class MeetingRetryServiceTests
     }
 
     [Fact]
+    public async Task RetryAsyncUsesMinutesStageForTranscriptInput()
+    {
+        var jobId = Guid.NewGuid();
+        var repository = new RetryStubMeetingJobRepository
+        {
+            MeetingJob = new MeetingJob
+            {
+                Id = jobId,
+                ProcessingMode = MeetingProcessingMode.MinutesFromTranscript,
+                Status = MeetingJobStatus.Failed,
+                Stage = MeetingJobStage.GeneratingMinutes
+            }
+        };
+        var service = new MeetingRetryService(repository, new StubBackgroundJobService());
+
+        var result = await service.RetryAsync(jobId, CancellationToken.None);
+
+        Assert.Equal("GeneratingMinutes", result.Stage);
+    }
+
+    [Fact]
     public async Task RetryAsyncRejectsCompletedJob()
     {
         var jobId = Guid.NewGuid();

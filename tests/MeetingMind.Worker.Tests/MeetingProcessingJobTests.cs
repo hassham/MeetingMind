@@ -32,6 +32,64 @@ public sealed class MeetingProcessingJobTests
     }
 
     [Fact]
+    public async Task TranscriptOnlyCompletesWithoutMinutesGeneration()
+    {
+        var harness = new ProcessingHarness();
+        harness.Repository.Job.ProcessingMode = MeetingProcessingMode.TranscriptOnly;
+
+        await harness.Job.ProcessMeetingAsync(harness.Repository.Job.Id);
+
+        Assert.Equal(1, harness.Audio.CallCount);
+        Assert.Equal(1, harness.Transcription.CallCount);
+        Assert.Equal(0, harness.Minutes.CallCount);
+        Assert.Null(harness.Repository.SavedMinutes);
+        Assert.Equal(MeetingJobStatus.Completed, harness.Repository.Job.Status);
+    }
+
+    [Fact]
+    public async Task MinutesFromTranscriptSkipsAudioAndTranscription()
+    {
+        var harness = new ProcessingHarness();
+        var transcriptPath = $"Transcript/{harness.Repository.Job.Id:N}.txt";
+        harness.Repository.Job.ProcessingMode = MeetingProcessingMode.MinutesFromTranscript;
+        harness.Repository.Job.OriginalFileName = "meeting.txt";
+        harness.Repository.Job.OriginalFilePath = transcriptPath;
+        harness.Repository.Transcript = new MeetingTranscript
+        {
+            MeetingJobId = harness.Repository.Job.Id,
+            TranscriptText = "Imported transcript",
+            TranscriptFilePath = transcriptPath
+        };
+        harness.Storage.Files.Add(transcriptPath);
+
+        await harness.Job.ProcessMeetingAsync(harness.Repository.Job.Id);
+
+        Assert.Equal(0, harness.Audio.CallCount);
+        Assert.Equal(0, harness.Transcription.CallCount);
+        Assert.Equal(1, harness.Minutes.CallCount);
+        Assert.NotNull(harness.Repository.SavedMinutes);
+        Assert.Equal(MeetingJobStatus.Completed, harness.Repository.Job.Status);
+    }
+
+    [Fact]
+    public async Task MinutesFromTranscriptFailsPermanentlyWithoutCheckpoint()
+    {
+        var harness = new ProcessingHarness();
+        harness.Repository.Job.ProcessingMode = MeetingProcessingMode.MinutesFromTranscript;
+        harness.Repository.Job.OriginalFileName = "meeting.txt";
+        harness.Repository.Job.OriginalFilePath = "Transcript/missing.txt";
+
+        await Assert.ThrowsAsync<PermanentMeetingProcessingException>(
+            () => harness.Job.ProcessMeetingAsync(harness.Repository.Job.Id));
+
+        Assert.Equal(0, harness.Audio.CallCount);
+        Assert.Equal(0, harness.Transcription.CallCount);
+        Assert.Equal(0, harness.Minutes.CallCount);
+        Assert.Equal(MeetingJobStatus.Failed, harness.Repository.Job.Status);
+        Assert.Equal(MeetingJobStage.GeneratingMinutes, harness.Repository.Job.Stage);
+    }
+
+    [Fact]
     public async Task TransientFailureSchedulesRetryThenSucceedsFromTranscriptCheckpoint()
     {
         var harness = new ProcessingHarness();
@@ -435,7 +493,7 @@ public sealed class MeetingProcessingJobTests
         public Task ResetForRetryAsync(Guid meetingJobId, CancellationToken cancellationToken)
         {
             Job.Status = MeetingJobStatus.Queued;
-            Job.Stage = MeetingJobStage.Uploaded;
+            Job.Stage = Job.ProcessingMode.InitialStage();
             Job.Progress = 0;
             Job.ErrorMessage = null;
             Job.AutomaticRetryCount = 0;

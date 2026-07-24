@@ -17,6 +17,8 @@ public class MeetingStatusServiceTests
             MeetingJob = new MeetingJob
             {
                 Id = jobId,
+                ProcessingMode = MeetingProcessingMode.TranscriptOnly,
+                SourceAudioDurationSeconds = 75,
                 Status = MeetingJobStatus.Failed,
                 Stage = MeetingJobStage.Failed,
                 Progress = 25,
@@ -36,6 +38,8 @@ public class MeetingStatusServiceTests
 
         Assert.NotNull(result);
         Assert.Equal(jobId, result.JobId);
+        Assert.Equal("TranscriptOnly", result.ProcessingMode);
+        Assert.Equal(75, result.SourceAudioDurationSeconds);
         Assert.Equal("Failed", result.Status);
         Assert.Equal("Failed", result.Stage);
         Assert.Equal(25, result.Progress);

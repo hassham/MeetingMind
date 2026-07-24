@@ -1,6 +1,9 @@
 using MeetingMind.Domain.Entities;
 using MeetingMind.Domain.Enums;
 using MeetingMind.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace MeetingMind.Infrastructure.IntegrationTests;
 
@@ -46,6 +49,71 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
         Assert.NotNull(saved.StartedAt);
         Assert.NotNull(saved.CompletedAt);
         Assert.True(saved.CompletedAt >= saved.StartedAt);
+    }
+
+    [Fact]
+    public async Task ProcessingModeAndAudioDurationRoundTrip()
+    {
+        await _fixture.ResetAsync();
+        await using var dbContext = _fixture.CreateDbContext();
+        var repository = new EfMeetingJobRepository(dbContext);
+        var job = CreateJob("transcript-only.mp3");
+        job.ProcessingMode = MeetingProcessingMode.TranscriptOnly;
+        job.SourceAudioDurationSeconds = 125;
+
+        await repository.AddAsync(job, CancellationToken.None);
+
+        var saved = await repository.GetByIdAsync(job.Id, CancellationToken.None);
+        Assert.NotNull(saved);
+        Assert.Equal(MeetingProcessingMode.TranscriptOnly, saved.ProcessingMode);
+        Assert.Equal(125, saved.SourceAudioDurationSeconds);
+    }
+
+    [Fact]
+    public async Task DatabaseRejectsInvalidModeSpecificAudioMetadata()
+    {
+        await _fixture.ResetAsync();
+        await using var dbContext = _fixture.CreateDbContext();
+        var job = CreateJob("imported.txt");
+        job.OriginalFilePath = "Transcript/imported.txt";
+        job.ProcessingMode = MeetingProcessingMode.MinutesFromTranscript;
+        job.ProcessedFilePath = "Audio/Processed/invalid.wav";
+        dbContext.MeetingJobs.Add(job);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => dbContext.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task Phase2RowsMigrateToFullMeetingAndIndexesExist()
+    {
+        await using var dbContext = _fixture.CreateDbContext();
+        await dbContext.Database.EnsureDeletedAsync();
+        var migrator = dbContext.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync("20260719045819_AddSafeErrorCode");
+        var jobId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($$"""
+            INSERT INTO "MeetingJobs"
+                ("Id", "OriginalFileName", "OriginalFilePath", "Status", "Stage", "Progress",
+                 "AutomaticRetryCount", "AutomaticRetryLimit", "CreatedAt", "UpdatedAt")
+            VALUES
+                ({{jobId}}, 'legacy.mp3', 'Audio/Original/legacy.mp3', 'Completed', 'Completed', 100,
+                 0, 0, {{now}}, {{now}})
+            """);
+
+        await migrator.MigrateAsync();
+        dbContext.ChangeTracker.Clear();
+
+        var migrated = await dbContext.MeetingJobs.AsNoTracking().SingleAsync(job => job.Id == jobId);
+        var indexes = await dbContext.Database.SqlQueryRaw<string>(
+                "SELECT indexname AS \"Value\" FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'MeetingJobs'")
+            .ToArrayAsync();
+
+        Assert.Equal(MeetingProcessingMode.FullMeeting, migrated.ProcessingMode);
+        Assert.Null(migrated.SourceAudioDurationSeconds);
+        Assert.Contains("IX_MeetingJobs_CreatedAt_Id", indexes);
+        Assert.Contains("IX_MeetingJobs_Status_CreatedAt", indexes);
+        Assert.Contains("IX_MeetingJobs_ProcessingMode_CreatedAt", indexes);
     }
 
     [Fact]
@@ -151,6 +219,26 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
         Assert.True(restarted.StartedAt > previousCompletedAt);
         Assert.Null(restarted.CompletedAt);
         Assert.Equal(2, restarted.AutomaticRetryLimit);
+    }
+
+    [Fact]
+    public async Task ResetForRetryUsesModeSpecificInitialStage()
+    {
+        await _fixture.ResetAsync();
+        await using var dbContext = _fixture.CreateDbContext();
+        var repository = new EfMeetingJobRepository(dbContext);
+        var job = CreateJob("imported.txt");
+        job.OriginalFilePath = "Transcript/imported.txt";
+        job.ProcessingMode = MeetingProcessingMode.MinutesFromTranscript;
+        job.Status = MeetingJobStatus.Failed;
+        job.Stage = MeetingJobStage.GeneratingMinutes;
+        await repository.AddAsync(job, CancellationToken.None);
+
+        await repository.ResetForRetryAsync(job.Id, CancellationToken.None);
+
+        var reset = await repository.GetByIdAsync(job.Id, CancellationToken.None);
+        Assert.NotNull(reset);
+        Assert.Equal(MeetingJobStage.GeneratingMinutes, reset.Stage);
     }
 
     [Fact]
