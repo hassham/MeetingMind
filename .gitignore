@@ -19,3 +19,6 @@ frontend/meetingmind-ui/.env
 Storage/
 .env
 appsettings.Development.json
+!src/MeetingMind.Api/appsettings.Development.json
+!src/MeetingMind.Worker/appsettings.Development.json
+/appsettings.Local.json

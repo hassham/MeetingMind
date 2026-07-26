@@ -10,15 +10,15 @@ preserved in [`docs/phase3/PLAN.md`](docs/phase3/PLAN.md).
 
 Status legend: `TODO` | `IN PROGRESS` | `BLOCKED` | `PARTIAL` | `DONE`
 
-Last updated: 2026-07-22.
+Last updated: 2026-07-26.
 
 ## Current delivery cycle: Phase 3
 
 **Theme:** Flexible meeting inputs, useful dashboards, readable transcripts,
 and independently trackable actions.
 
-**Overall status:** `IN PROGRESS` — P3-02 mode-aware jobs and safe migration
-completed on 2026-07-22. P3-03 is next and has not started.
+**Overall status:** `IN PROGRESS` — P3-03 is implemented; PostgreSQL-backed
+API and persistence verification is blocked until Docker is available.
 
 ### Phase 3 outcome
 
@@ -105,9 +105,10 @@ Additional tracking rules:
 
 ## Current focus
 
-P3-02 is complete. P3-03 is next and must begin with its own `WORKFLOW.md`
-Discovery Report and confirmation before new upload endpoints or frontend
-workflow changes are implemented.
+P3-03 implementation and Docker-independent verification are complete. Start
+Docker, start the Development API so it applies migrations automatically, and
+run the full solution test suite to close its remaining integration verification
+gate before beginning P3-04.
 
 ### P3-01 — Reconcile Phase 3 requirements, UX, and contracts
 
@@ -266,31 +267,33 @@ Notes:
 
 ### P3-03 — Deliver all three creation workflows
 
-**Status:** `TODO`
+**Status:** `IN PROGRESS — VERIFICATION BLOCKED`
 
 **Depends on:** P3-02.
-**Completion:** Not started.
+**Started:** 2026-07-26.
+**Completion:** Implemented 2026-07-26; Docker-backed API and persistence tests
+remain to be executed.
 
-- [ ] Add the explicit audio creation endpoint and processing-mode validation.
-- [ ] Preserve `/api/meetings/upload` as a documented deprecated
+- [x] Add the explicit audio creation endpoint and processing-mode validation.
+- [x] Preserve `/api/meetings/upload` as a documented deprecated
       `FullMeeting` alias.
-- [ ] Add `.txt`/`.md` transcript upload with safe filename, extension, MIME,
+- [x] Add `.txt`/`.md` transcript upload with safe filename, extension, MIME,
       size, UTF-8, binary, non-empty, whitespace-only, and character-limit
       validation.
-- [ ] Store transcript uploads behind `IFileStorageService`; never expose local
+- [x] Store transcript uploads behind `IFileStorageService`; never expose local
       paths.
-- [ ] Dispatch the Worker pipeline by processing mode through Application
+- [x] Dispatch the Worker pipeline by processing mode through Application
       abstractions.
-- [ ] Implement `TranscriptOnly` without an OpenAI minutes call.
-- [ ] Implement `FullMeeting` without regressing the current pipeline.
-- [ ] Implement `MinutesFromTranscript` without FFmpeg or Whisper calls.
-- [ ] Define and implement monotonic stages/progress for every mode without
+- [x] Implement `TranscriptOnly` without an OpenAI minutes call.
+- [x] Implement `FullMeeting` without regressing the current pipeline.
+- [x] Implement `MinutesFromTranscript` without FFmpeg or Whisper calls.
+- [x] Define and implement monotonic stages/progress for every mode without
       presenting skipped work as executed.
-- [ ] Make failure classification, automatic retry, manual retry, cancellation,
+- [x] Make failure classification, automatic retry, manual retry, cancellation,
       and checkpoint reuse correct for every mode.
-- [ ] Build the New Processing Job UI with three clear choices and mode-specific
+- [x] Build the New Processing Job UI with three clear choices and mode-specific
       upload guidance.
-- [ ] Add unit, persistence, API, Worker, and frontend tests for success and
+- [x] Add unit, persistence, API, Worker, and frontend tests for success and
       failure paths in every mode.
 
 Acceptance criteria:
@@ -304,7 +307,24 @@ Acceptance criteria:
 - Existing full-meeting clients continue to work through the compatibility
   endpoint.
 
-Evidence: Pending.
+Evidence:
+
+- `dotnet build MeetingMind.sln --no-restore` passed with zero warnings and
+  zero errors on 2026-07-26.
+- Docker-independent backend verification passed: 39 Application/Domain unit
+  tests, 36 Worker tests, and 2 local-storage integration tests.
+- Frontend verification passed: ESLint, production build, and 20 Vitest tests.
+- The PostgreSQL-backed API suite compiles and includes explicit-mode,
+  compatibility, strict transcript-validation, persistence, and pre-enqueue
+  rejection coverage. Execution is pending because the local Docker engine was
+  unavailable (`npipe://./pipe/docker_engine` access denied).
+- The answered P3-03 decisions are archived in
+  `docs/archive/phase3/QUESTIONS_p3_03_creation_workflows.md`.
+- Local startup was simplified on 2026-07-26: committed Development paths,
+  shared ignored local secrets, API-owned automatic Development migrations,
+  Worker schema readiness, a confirmed reset utility, and the revised
+  `LOCAL_RUN_AND_TEST_GUIDE.md`. Decisions are archived in
+  `docs/archive/phase3/QUESTIONS_local_development_startup.md`.
 
 ### P3-04 — Produce readable structured transcripts
 

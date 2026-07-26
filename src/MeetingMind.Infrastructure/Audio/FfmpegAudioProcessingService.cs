@@ -29,7 +29,7 @@ public class FfmpegAudioProcessingService : IAudioProcessingService
         }
     }
 
-    public async Task<string> ConvertToStandardFormatAsync(
+    public async Task<AudioProcessingResult> ConvertToStandardFormatAsync(
         string inputPath,
         CancellationToken cancellationToken)
     {
@@ -47,6 +47,7 @@ public class FfmpegAudioProcessingService : IAudioProcessingService
 
         try
         {
+            var mediaInfo = await FFProbe.AnalyseAsync(inputFullPath, cancellationToken: cancellationToken);
             await FFMpegArguments
                 .FromFileInput(inputFullPath)
                 .OutputToFile(outputFullPath, overwrite: false, options => options
@@ -59,6 +60,10 @@ public class FfmpegAudioProcessingService : IAudioProcessingService
                 {
                     BinaryFolder = GetConfiguredBinaryFolder()
                 });
+
+            return new AudioProcessingResult(
+                NormalizePath(outputRelativePath),
+                Math.Max(0, (long)Math.Ceiling(mediaInfo.Duration.TotalSeconds)));
         }
         catch (Exception exception)
         {
@@ -69,8 +74,6 @@ public class FfmpegAudioProcessingService : IAudioProcessingService
 
             throw new InvalidOperationException(SanitizeError(exception.Message), exception);
         }
-
-        return NormalizePath(outputRelativePath);
     }
 
     private string GetSafeFullPath(string relativePath)

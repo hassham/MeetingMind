@@ -21,6 +21,12 @@ public interface IMeetingJobRepository
 
     Task SetProcessedFilePathAsync(Guid meetingJobId, string processedFilePath, CancellationToken cancellationToken);
 
+    Task SetAudioProcessingResultAsync(
+        Guid meetingJobId,
+        string processedFilePath,
+        long sourceAudioDurationSeconds,
+        CancellationToken cancellationToken);
+
     Task SaveTranscriptAsync(
         Guid meetingJobId,
         string transcriptText,

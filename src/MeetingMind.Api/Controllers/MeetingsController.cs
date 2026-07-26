@@ -2,6 +2,7 @@ using MeetingMind.Application.Common.Exceptions;
 using MeetingMind.Application.Common.Failures;
 using MeetingMind.Application.Meetings;
 using Microsoft.AspNetCore.Mvc;
+using MeetingMind.Domain.Enums;
 
 namespace MeetingMind.Api.Controllers;
 
@@ -33,6 +34,7 @@ public class MeetingsController : ControllerBase
     }
 
     [HttpPost("upload")]
+    [Obsolete("Use POST /api/meetings/audio with an explicit processing mode.")]
     [DisableRequestSizeLimit]
     public async Task<IActionResult> Upload([FromForm] IFormFile file, CancellationToken cancellationToken)
     {
@@ -41,7 +43,8 @@ public class MeetingsController : ControllerBase
             stream,
             file.FileName,
             file.ContentType,
-            file.Length);
+            file.Length,
+            MeetingProcessingMode.FullMeeting);
 
         try
         {
@@ -61,6 +64,65 @@ public class MeetingsController : ControllerBase
                 errorCode = MeetingErrorCodes.UploadValidation,
                 error = exception.Message
             });
+        }
+    }
+
+    [HttpPost("audio")]
+    [DisableRequestSizeLimit]
+    public async Task<IActionResult> UploadAudio(
+        [FromForm] IFormFile file,
+        [FromForm] string mode,
+        CancellationToken cancellationToken)
+    {
+        if (!Enum.TryParse<MeetingProcessingMode>(mode, ignoreCase: false, out var processingMode))
+        {
+            return UploadValidationError(
+                "Processing mode must be TranscriptOnly or FullMeeting.");
+        }
+
+        await using var stream = file.OpenReadStream();
+        var request = new UploadMeetingRequest(
+            stream,
+            file.FileName,
+            file.ContentType,
+            file.Length,
+            processingMode);
+
+        try
+        {
+            var result = await _uploadMeetingService.UploadAsync(request, cancellationToken);
+            return AcceptedResult(result, includeMode: true);
+        }
+        catch (UploadValidationException exception)
+        {
+            return UploadValidationError(exception.Message);
+        }
+    }
+
+    [HttpPost("transcript")]
+    [DisableRequestSizeLimit]
+    public async Task<IActionResult> UploadTranscript(
+        [FromForm] IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = file.OpenReadStream();
+        var request = new UploadMeetingRequest(
+            stream,
+            file.FileName,
+            file.ContentType,
+            file.Length,
+            MeetingProcessingMode.MinutesFromTranscript);
+
+        try
+        {
+            var result = await _uploadMeetingService.UploadTranscriptAsync(
+                request,
+                cancellationToken);
+            return AcceptedResult(result, includeMode: true);
+        }
+        catch (UploadValidationException exception)
+        {
+            return UploadValidationError(exception.Message);
         }
     }
 
@@ -216,5 +278,33 @@ public class MeetingsController : ControllerBase
         }
 
         return File(result.Content, result.ContentType, result.FileName);
+    }
+
+    private IActionResult AcceptedResult(UploadMeetingResult result, bool includeMode)
+    {
+        var location = $"/api/meetings/{result.JobId}/status";
+        return includeMode
+            ? Accepted(location, new
+            {
+                jobId = result.JobId,
+                processingMode = result.ProcessingMode.ToString(),
+                status = result.Status.ToString(),
+                stage = result.Stage.ToString()
+            })
+            : Accepted(location, new
+            {
+                jobId = result.JobId,
+                status = result.Status.ToString(),
+                stage = result.Stage.ToString()
+            });
+    }
+
+    private BadRequestObjectResult UploadValidationError(string message)
+    {
+        return BadRequest(new
+        {
+            errorCode = MeetingErrorCodes.UploadValidation,
+            error = message
+        });
     }
 }

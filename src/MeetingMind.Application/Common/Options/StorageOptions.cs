@@ -6,6 +6,10 @@ public class StorageOptions
 
     public int MaxUploadSizeMb { get; set; } = 100;
 
+    public int MaxTranscriptUploadSizeMb { get; set; } = 10;
+
+    public int MaxTranscriptCharacters { get; set; } = 1_200_000;
+
     public string[] AllowedExtensions { get; set; } = [".mp3", ".wav", ".m4a", ".aac"];
 
     public string OriginalAudioFolder { get; set; } = Path.Combine("Audio", "Original");
@@ -17,4 +21,6 @@ public class StorageOptions
     public string MinutesFolder { get; set; } = "Minutes";
 
     public long MaxUploadSizeBytes => MaxUploadSizeMb * 1024L * 1024L;
+
+    public long MaxTranscriptUploadSizeBytes => MaxTranscriptUploadSizeMb * 1024L * 1024L;
 }

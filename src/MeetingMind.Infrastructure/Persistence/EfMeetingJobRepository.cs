@@ -88,6 +88,20 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task SetAudioProcessingResultAsync(
+        Guid meetingJobId,
+        string processedFilePath,
+        long sourceAudioDurationSeconds,
+        CancellationToken cancellationToken)
+    {
+        var meetingJob = await GetMeetingJobAsync(meetingJobId, cancellationToken);
+        meetingJob.ProcessedFilePath = processedFilePath;
+        meetingJob.SourceAudioDurationSeconds = sourceAudioDurationSeconds;
+        meetingJob.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task SaveTranscriptAsync(
         Guid meetingJobId,
         string transcriptText,

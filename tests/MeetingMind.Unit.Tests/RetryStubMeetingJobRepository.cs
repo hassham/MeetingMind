@@ -88,6 +88,12 @@ internal sealed class RetryStubMeetingJobRepository : IMeetingJobRepository
         throw new NotSupportedException();
     }
 
+    public Task SetAudioProcessingResultAsync(
+        Guid meetingJobId,
+        string processedFilePath,
+        long sourceAudioDurationSeconds,
+        CancellationToken cancellationToken) => throw new NotSupportedException();
+
     public Task ScheduleAutomaticRetryAsync(
         Guid meetingJobId,
         MeetingJobStage stage,

@@ -86,6 +86,85 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
         Assert.Empty(_factory.BackgroundJobs.EnqueuedJobIds);
     }
 
+    [Theory]
+    [InlineData("TranscriptOnly")]
+    [InlineData("FullMeeting")]
+    public async Task AudioEndpointAcceptsSupportedExplicitModes(string mode)
+    {
+        await _factory.ResetAsync();
+        using var form = CreateUpload("planning.mp3", "audio/mpeg", "audio bytes");
+        form.Add(new StringContent(mode), "mode");
+
+        var response = await _factory.Client.PostAsync("/api/meetings/audio", form);
+        var json = await ReadJsonAsync(response);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal(mode, json.RootElement.GetProperty("processingMode").GetString());
+        Assert.Equal("Queued", json.RootElement.GetProperty("status").GetString());
+        Assert.Single(_factory.BackgroundJobs.EnqueuedJobIds);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("MinutesFromTranscript")]
+    [InlineData("fullmeeting")]
+    public async Task AudioEndpointRejectsMissingOrUnsupportedMode(string mode)
+    {
+        await _factory.ResetAsync();
+        using var form = CreateUpload("planning.mp3", "audio/mpeg", "audio bytes");
+        if (mode.Length > 0)
+        {
+            form.Add(new StringContent(mode), "mode");
+        }
+
+        var response = await _factory.Client.PostAsync("/api/meetings/audio", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(_factory.BackgroundJobs.EnqueuedJobIds);
+    }
+
+    [Theory]
+    [InlineData("notes.txt", "text/plain")]
+    [InlineData("notes.md", "text/markdown")]
+    public async Task TranscriptEndpointNormalizesAndPersistsValidUtf8(
+        string fileName,
+        string contentType)
+    {
+        await _factory.ResetAsync();
+        using var form = CreateUpload(fileName, contentType, "\uFEFFFirst\r\n\rSecond\r");
+
+        var response = await _factory.Client.PostAsync("/api/meetings/transcript", form);
+        var json = await ReadJsonAsync(response);
+        var jobId = json.RootElement.GetProperty("jobId").GetGuid();
+        var transcript = await _factory.Client.GetStringAsync(
+            $"/api/meetings/{jobId}/transcript/download");
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal("MinutesFromTranscript", json.RootElement.GetProperty("processingMode").GetString());
+        Assert.Equal("First\n\nSecond\n", transcript);
+        Assert.Equal(jobId, Assert.Single(_factory.BackgroundJobs.EnqueuedJobIds));
+    }
+
+    [Theory]
+    [InlineData("notes.md", "text/plain", "Valid text")]
+    [InlineData("notes.txt", "text/markdown", "Valid text")]
+    [InlineData("notes.txt", "text/plain", " \r\n\t")]
+    [InlineData("notes.txt", "text/plain", "Text\0binary")]
+    [InlineData("notes.txt", "text/plain", "Text\u0001binary")]
+    public async Task TranscriptEndpointRejectsInvalidInputBeforeEnqueue(
+        string fileName,
+        string contentType,
+        string content)
+    {
+        await _factory.ResetAsync();
+        using var form = CreateUpload(fileName, contentType, content);
+
+        var response = await _factory.Client.PostAsync("/api/meetings/transcript", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(_factory.BackgroundJobs.EnqueuedJobIds);
+    }
+
     [Fact]
     public async Task StatusReturnsPersistedStateAndMissingJobReturnsNotFound()
     {

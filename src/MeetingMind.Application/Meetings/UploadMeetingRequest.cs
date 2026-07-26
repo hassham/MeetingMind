@@ -4,4 +4,6 @@ public sealed record UploadMeetingRequest(
     Stream File,
     string FileName,
     string ContentType,
-    long Length);
+    long Length,
+    MeetingMind.Domain.Enums.MeetingProcessingMode ProcessingMode =
+        MeetingMind.Domain.Enums.MeetingProcessingMode.FullMeeting);

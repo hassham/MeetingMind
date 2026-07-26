@@ -42,6 +42,7 @@ public sealed class MeetingProcessingJobTests
         Assert.Equal(1, harness.Audio.CallCount);
         Assert.Equal(1, harness.Transcription.CallCount);
         Assert.Equal(0, harness.Minutes.CallCount);
+        Assert.Equal(75, harness.Repository.Job.SourceAudioDurationSeconds);
         Assert.Null(harness.Repository.SavedMinutes);
         Assert.Equal(MeetingJobStatus.Completed, harness.Repository.Job.Status);
     }
@@ -324,12 +325,14 @@ public sealed class MeetingProcessingJobTests
 
         public int CallCount { get; private set; }
 
-        public Task<string> ConvertToStandardFormatAsync(string inputPath, CancellationToken cancellationToken)
+        public Task<AudioProcessingResult> ConvertToStandardFormatAsync(
+            string inputPath,
+            CancellationToken cancellationToken)
         {
             CallCount++;
             return Exception is null
-                ? Task.FromResult("Audio/Processed/meeting.wav")
-                : Task.FromException<string>(Exception);
+                ? Task.FromResult(new AudioProcessingResult("Audio/Processed/meeting.wav", 75))
+                : Task.FromException<AudioProcessingResult>(Exception);
         }
     }
 
@@ -466,6 +469,17 @@ public sealed class MeetingProcessingJobTests
         public Task SetProcessedFilePathAsync(Guid meetingJobId, string processedFilePath, CancellationToken cancellationToken)
         {
             Job.ProcessedFilePath = processedFilePath;
+            return Task.CompletedTask;
+        }
+
+        public Task SetAudioProcessingResultAsync(
+            Guid meetingJobId,
+            string processedFilePath,
+            long sourceAudioDurationSeconds,
+            CancellationToken cancellationToken)
+        {
+            Job.ProcessedFilePath = processedFilePath;
+            Job.SourceAudioDurationSeconds = sourceAudioDurationSeconds;
             return Task.CompletedTask;
         }
 

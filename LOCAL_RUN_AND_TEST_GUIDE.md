@@ -1,217 +1,127 @@
-# Run MeetingMind locally
+# Run and test MeetingMind locally
 
-Follow these steps in order. Run the commands from the solution folder unless
-the step says otherwise.
+MeetingMind's Development configuration already contains the local PostgreSQL,
+Storage, and FFmpeg settings for this checkout. You do not need to set
+`Storage__RootPath`, `AudioProcessing__FfmpegBinaryFolder`, or run
+`dotnet ef database update` during normal development.
 
-## 0. One-time prerequisites and configuration
+## One-time setup
 
 Install:
 
 - .NET 8 SDK
 - Docker Desktop
 - Node.js and npm
-- FFmpeg
-- An OpenAI API key
+- FFmpeg at `C:\ffmpeg\build\bin\ffmpeg.exe`
 
-Configure the shared storage folder:
+The committed Development settings use:
 
-```powershell
-$storageRoot = (New-Item -ItemType Directory -Force -Path .\Storage).FullName
-[Environment]::SetEnvironmentVariable("Storage__RootPath", $storageRoot, "User")
-$env:Storage__RootPath = $storageRoot
-```
+- Repository: `C:\work\Meetingminutes\MeetingMind`
+- Storage: `C:\work\Meetingminutes\MeetingMind\Storage`
+- FFmpeg: `C:\ffmpeg\build\bin\ffmpeg.exe`
+- PostgreSQL: `127.0.0.1:5432`, database `meetingmind`
 
-Configure your FFmpeg executable:
+If this checkout or FFmpeg moves, update both:
 
-```powershell
-$ffmpegPath = "C:\ffmpeg\build\bin\ffmpeg.exe"
-[Environment]::SetEnvironmentVariable("AudioProcessing__FfmpegBinaryFolder", $ffmpegPath, "User")
-$env:AudioProcessing__FfmpegBinaryFolder = $ffmpegPath
-```
+- `src/MeetingMind.Api/appsettings.Development.json`
+- `src/MeetingMind.Worker/appsettings.Development.json`
 
-Store the OpenAI API key for the Worker:
+### Add the local OpenAI key once
+
+From the repository root:
 
 ```powershell
-dotnet user-secrets set "OpenAI:ApiKey" "your-openai-api-key" --project src\MeetingMind.Worker
+Copy-Item appsettings.Local.example.json appsettings.Local.json
+notepad appsettings.Local.json
 ```
 
-Open new PowerShell windows after setting user environment variables. Never
-commit the OpenAI key.
+Replace the placeholder with the real key and save the file:
 
-### Recommended PowerShell window layout
-
-Use four PowerShell windows so that each long-running application remains
-visible and can be stopped independently:
-
-| Window | Purpose | Keep running? |
-| --- | --- | --- |
-| 1 | Docker, migrations, health checks, and test commands | No |
-| 2 | MeetingMind Web API | Yes |
-| 3 | MeetingMind Worker | Yes |
-| 4 | React frontend | Yes |
-
-New PowerShell windows normally inherit saved user environment variables at
-startup, but the API and Worker commands below also set their required values
-explicitly. This makes each backend window self-contained.
-
-## 1. Start the PostgreSQL database in Docker
-
-Start Docker Desktop, then run:
-
-```powershell
-docker compose up -d
+```json
+{
+  "OpenAI": {
+    "ApiKey": "your-real-key"
+  }
+}
 ```
 
-## 2. Check that the database is running
+`appsettings.Local.json` is ignored by Git and is loaded by both the API and
+Worker. Never add the real key to either committed Development settings file.
 
-```powershell
-docker compose ps
-```
-
-The `meetingmind-postgres` service should show as running and healthy.
-
-For a direct PostgreSQL check:
-
-```powershell
-docker compose exec meetingmind-postgres pg_isready -U meetingmind_user -d meetingmind
-```
-
-Expected result:
-
-```text
-/var/run/postgresql:5432 - accepting connections
-```
-
-If the database is not healthy, inspect its logs:
-
-```powershell
-docker compose logs meetingmind-postgres
-```
-
-Do not continue until PostgreSQL is accepting connections.
-
-## 3. Restore .NET dependencies and apply migrations
-
-Restore the solution and local .NET tools:
+Restore dependencies once after cloning or after dependency changes:
 
 ```powershell
 dotnet tool restore
 dotnet restore MeetingMind.sln
+Set-Location frontend\meetingmind-ui
+npm.cmd install
+Set-Location ..\..
 ```
 
-Apply the database migrations:
+## Normal startup
+
+Use four PowerShell windows so each long-running process remains visible.
+
+### 1. Start PostgreSQL
+
+Start Docker Desktop. In PowerShell window 1:
 
 ```powershell
-$env:Storage__RootPath = (New-Item -ItemType Directory -Force -Path .\Storage).FullName; dotnet ef database update --project src\MeetingMind.Infrastructure --startup-project src\MeetingMind.Api
+docker compose up -d
+docker compose ps
+docker compose exec meetingmind-postgres pg_isready -U meetingmind_user -d meetingmind
 ```
 
-Setting `Storage__RootPath` on the same line ensures the API startup used by EF
-can create its service provider even when this PowerShell window was opened
-before the user environment variable was saved. Run the command from the
-solution folder.
+Continue when PostgreSQL reports `accepting connections`.
 
-Build the solution before starting the applications:
+If Docker returns `Access is denied`, open Docker Desktop and PowerShell with
+the permissions required by your Windows Docker installation.
+
+### 2. Start the API and apply migrations automatically
+
+In PowerShell window 2:
 
 ```powershell
-dotnet build MeetingMind.sln
+dotnet run --project src\MeetingMind.Api --launch-profile http
 ```
 
-## 4. Start the Web API in PowerShell Window 2
-
-Open a new PowerShell window and move to the solution folder. Replace the
-example repository path if your checkout is elsewhere:
-
-```powershell
-$repo = "C:\work\Meetingminutes\MeetingMind"
-Set-Location $repo
-$env:Storage__RootPath = (New-Item -ItemType Directory -Force -Path .\Storage).FullName; $env:AudioProcessing__FfmpegBinaryFolder = "C:\ffmpeg\build\bin\ffmpeg.exe"; dotnet run --project src\MeetingMind.Api --launch-profile http
-```
-
-Keep this window running after the API starts.
-
-The API should listen on:
+In Development, the API waits for PostgreSQL and applies all pending EF Core
+migrations before it starts listening. When Swagger opens successfully, the
+database schema is ready:
 
 ```text
-http://localhost:5059
+http://localhost:5059/swagger
 ```
 
-Use PowerShell Window 1 to check the API and database while Window 2 continues
-running:
+Do not routinely run `dotnet ef database update`. If PostgreSQL is unavailable,
+the API retries for about 30 seconds and then reports a focused Docker/database
+startup error. The committed Development connection uses IPv4 explicitly to
+avoid a Windows `localhost`/WSL IPv6 relay taking precedence over Docker's
+published PostgreSQL port.
+
+### 3. Start the Worker
+
+After Swagger is available, use PowerShell window 3:
 
 ```powershell
-Invoke-RestMethod http://localhost:5059/health
-Invoke-RestMethod http://localhost:5059/health/db
-```
-
-Both requests should report `Healthy`.
-
-The full readiness endpoint may still report the Whisper model as unhealthy
-until the Worker has started and downloaded it.
-
-## 5. Start the Worker in PowerShell Window 3
-
-Open a separate PowerShell window:
-
-```powershell
-$repo = "C:\work\Meetingminutes\MeetingMind"
-Set-Location $repo
-$env:Storage__RootPath = (New-Item -ItemType Directory -Force -Path .\Storage).FullName; 
-$env:AudioProcessing__FfmpegBinaryFolder = "C:\ffmpeg\build\bin\ffmpeg.exe"; 
 dotnet run --project src\MeetingMind.Worker
 ```
 
-Because both commands resolve `.\Storage` from the same solution folder, API
-and Worker receive the same absolute storage root. Keep both windows open. Do
-not start API and Worker in the same terminal because stopping one process
-would also interrupt the workflow for the other.
+The Worker verifies that PostgreSQL is reachable and that no migrations are
+pending. It never changes the schema. If it reports pending migrations, stop it,
+start the API, wait for Swagger, and then start the Worker again.
 
-The Worker should start a Hangfire server and listen to the `default` queue.
-The first transcription may take longer while the Whisper model is downloaded.
+The first transcription can take longer while the local Whisper model is
+downloaded.
 
-After the Worker is ready, check all dependencies:
+### 4. Start the frontend
 
-```powershell
-Invoke-RestMethod http://localhost:5059/health/ready
-```
-
-Confirm these checks are `Healthy`:
-
-- `database`
-- `storage`
-- `ffmpeg`
-- `whisper_model`
-
-You can also confirm that the Worker is registered from the Hangfire dashboard:
-
-```text
-http://localhost:5059/hangfire
-```
-
-On a fresh machine, `whisper_model` can remain unhealthy until the first job
-reaches transcription, because model download is demand-driven. In that case:
-
-1. Confirm `database`, `storage`, and `ffmpeg` are healthy.
-2. Continue to the frontend and upload a short privacy-safe test recording.
-3. Leave the Worker running while it downloads the model and processes the job.
-4. Request `/health/ready` again and confirm all four checks are healthy.
-
-Do not process real meeting audio until the first model download and readiness
-check have completed successfully.
-
-## 6. Install and start the frontend in PowerShell Window 4
-
-Open a third long-running application window. The frontend does not require the
-.NET storage or FFmpeg environment variables:
+In PowerShell window 4:
 
 ```powershell
-$repo = "C:\work\Meetingminutes\MeetingMind"
-Set-Location "$repo\frontend\meetingmind-ui"
-
-npm.cmd install
+Set-Location frontend\meetingmind-ui
 npm.cmd run dev
 ```
-
-Keep Window 4 running alongside the API and Worker windows.
 
 Open:
 
@@ -219,35 +129,74 @@ Open:
 http://localhost:5173
 ```
 
-The frontend development server proxies API requests to
-`http://localhost:5059`.
+The frontend proxies API requests to `http://localhost:5059`.
 
-## 7. Test the complete application
+## Confirm readiness
 
-1. Open `http://localhost:5173`.
-2. Select a supported MP3, WAV, M4A, or AAC recording.
-3. Confirm the upload appears immediately in History as `Queued`.
-4. Confirm the status advances through processing stages.
-5. Wait until the job reaches `Completed` and 100%.
-6. Confirm the history card and selected-job status agree.
-7. Confirm both structured Minutes and Transcript content are displayed.
-8. Download Transcript and Minutes.
-9. Confirm both downloaded files are non-empty.
-10. Refresh the browser and confirm the job remains in History.
-
-Use privacy-safe test audio rather than a real confidential meeting recording.
-
-## 8. Run the automated test suites
-
-Keep Docker Desktop running.
-
-Backend tests:
+With the API and Worker running:
 
 ```powershell
+Invoke-RestMethod http://localhost:5059/health
+Invoke-RestMethod http://localhost:5059/health/db
+Invoke-RestMethod http://localhost:5059/health/ready
+```
+
+The readiness response reports:
+
+- `database`
+- `storage`
+- `ffmpeg`
+- `whisper_model`
+
+The Whisper model can remain unavailable until the first transcription triggers
+its download. Use privacy-safe test audio for that initial job.
+
+Hangfire is available at:
+
+```text
+http://localhost:5059/hangfire
+```
+
+## Test the three processing workflows
+
+Open `http://localhost:5173` and verify:
+
+### Audio to transcript and minutes
+
+1. Select **Audio → transcript and meeting minutes**.
+2. Upload a supported MP3, WAV, M4A, or AAC file.
+3. Confirm the job is accepted immediately and reaches `Completed`.
+4. Confirm both Transcript and Minutes are available.
+
+### Audio to transcript only
+
+1. Select **Audio → transcript only**.
+2. Upload supported audio.
+3. Confirm the job completes with a Transcript.
+4. Confirm no meeting minutes were generated.
+
+### Transcript to minutes
+
+1. Select **Transcript → meeting minutes**.
+2. Upload UTF-8 `.txt` as `text/plain` or `.md` as `text/markdown`.
+3. Confirm the job skips audio processing and produces Minutes.
+4. Confirm the uploaded transcript remains downloadable.
+
+For every workflow, refresh the browser and confirm accepted jobs remain in
+History. Test retry behavior with a failed or cancelled job where practical.
+
+## Automated verification
+
+Keep Docker Desktop running for PostgreSQL-backed integration tests.
+
+Backend:
+
+```powershell
+dotnet build MeetingMind.sln
 dotnet test MeetingMind.sln
 ```
 
-Frontend tests:
+Frontend:
 
 ```powershell
 Set-Location frontend\meetingmind-ui
@@ -258,44 +207,77 @@ npm.cmd run build
 Set-Location ..\..
 ```
 
-Expected Phase 2 baseline:
+All commands should complete with zero failures. Test counts can increase as
+Phase 3 work is added, so use the test result rather than an old fixed count.
 
-- 87 backend tests pass
-- 19 frontend tests pass
-- backend and frontend builds complete without errors
+## Database troubleshooting
 
-## Common startup errors
+### API cannot connect to PostgreSQL
 
-### `Storage:RootPath` is required
-
-Set the variable in the same terminal that starts API or Worker:
+Check Docker and PostgreSQL:
 
 ```powershell
-$env:Storage__RootPath = (Resolve-Path .\Storage).Path
+docker compose ps
+docker compose logs meetingmind-postgres
+docker compose exec meetingmind-postgres pg_isready -U meetingmind_user -d meetingmind
+Test-NetConnection 127.0.0.1 -Port 5432
 ```
 
-### `AudioProcessing:FfmpegBinaryFolder` is required
+The API will apply migrations automatically after PostgreSQL becomes reachable.
+
+### Worker reports pending migrations
+
+Stop the Worker. Start the Development API and wait for Swagger, then restart
+the Worker.
+
+### Reset an unrecoverable local database
+
+Reset only when local data can be discarded. The reset removes the MeetingMind
+PostgreSQL Docker volume, including all job metadata and migration history. It
+does not delete files under `Storage`.
+
+Run:
 
 ```powershell
-$env:AudioProcessing__FfmpegBinaryFolder = "C:\ffmpeg\build\bin\ffmpeg.exe"
+.\scripts\reset-local-database.ps1
 ```
 
-The setting name is `FfmpegBinaryFolder`, even when its value points directly
-to `ffmpeg.exe`.
+The script requires this exact confirmation phrase:
+
+```text
+DELETE MEETINGMIND LOCAL DATABASE
+```
+
+After reset, start the API. It recreates and migrates the database
+automatically.
+
+Never use `docker compose down -v` as a routine stop command.
+
+## Other common problems
+
+### Worker reports that `OpenAI:ApiKey` is required
+
+Create or correct root `appsettings.Local.json` using
+`appsettings.Local.example.json`. Do not commit the local file.
+
+### FFmpeg configuration fails
+
+Confirm this file exists:
+
+```powershell
+Test-Path C:\ffmpeg\build\bin\ffmpeg.exe
+```
+
+If FFmpeg is elsewhere, update both Development appsettings files.
 
 ### Jobs remain queued
 
-Check that:
+Confirm:
 
-- The Worker process is running.
-- The Hangfire dashboard shows an active server.
-- API and Worker use the same database and `Storage__RootPath`.
-- The Worker terminal has no startup configuration error.
-
-### `/health/ready` returns HTTP 503
-
-Read the individual readiness check results. Then verify PostgreSQL, storage,
-FFmpeg, and the Whisper model before continuing.
+- Worker is running.
+- Hangfire shows an active server.
+- API and Worker point to the same PostgreSQL database and Storage folder.
+- Worker terminal contains no configuration or provider error.
 
 ## Stop MeetingMind
 
@@ -303,13 +285,10 @@ Press `Ctrl+C` in this order:
 
 1. Frontend
 2. Worker
-3. Web API
+3. API
 
 Then stop PostgreSQL while preserving its data:
 
 ```powershell
 docker compose down
 ```
-
-Do not use `docker compose down -v` unless you intentionally want to delete the
-database volume.

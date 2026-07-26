@@ -20,6 +20,22 @@ public static class MeetingMindConfiguration
         "large-v3-turbo"
     };
 
+    public static string GetRepositoryLocalSettingsPath(string contentRootPath)
+    {
+        var current = new DirectoryInfo(Path.GetFullPath(contentRootPath));
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "MeetingMind.sln")))
+            {
+                return Path.Combine(current.FullName, "appsettings.Local.json");
+            }
+
+            current = current.Parent;
+        }
+
+        return Path.Combine(Path.GetFullPath(contentRootPath), "appsettings.Local.json");
+    }
+
     public static string GetConnectionString(IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection");
@@ -57,6 +73,16 @@ public static class MeetingMindConfiguration
         if (options.MaxUploadSizeMb <= 0)
         {
             throw Invalid("Storage:MaxUploadSizeMb", "must be greater than zero");
+        }
+
+        if (options.MaxTranscriptUploadSizeMb <= 0)
+        {
+            throw Invalid("Storage:MaxTranscriptUploadSizeMb", "must be greater than zero");
+        }
+
+        if (options.MaxTranscriptCharacters <= 0)
+        {
+            throw Invalid("Storage:MaxTranscriptCharacters", "must be greater than zero");
         }
 
         if (options.AllowedExtensions is null || options.AllowedExtensions.Length == 0)
@@ -178,7 +204,13 @@ public static class MeetingMindConfiguration
 
     public static OpenAiOptions ValidateOpenAiOptions(OpenAiOptions options)
     {
-        RequireText(options.ApiKey, "OpenAI:ApiKey", "is required");
+        if (string.IsNullOrWhiteSpace(options.ApiKey))
+        {
+            throw Invalid(
+                "OpenAI:ApiKey",
+                "is required; copy appsettings.Local.example.json to appsettings.Local.json and add the local key");
+        }
+
         RequireText(options.Model, "OpenAI:Model", "is required");
 
         return options;
@@ -237,6 +269,20 @@ public static class MeetingMindConfiguration
             {
                 throw Invalid($"AutomaticRetry:DelaysInSeconds:{index}", "must be greater than zero");
             }
+        }
+
+        return options;
+    }
+
+    public static DatabaseStartupOptions ValidateDatabaseStartupOptions(
+        DatabaseStartupOptions options)
+    {
+        RequirePositive(options.MaxAttempts, "DatabaseStartup:MaxAttempts");
+        RequirePositive(options.DelaySeconds, "DatabaseStartup:DelaySeconds");
+
+        if (options.MaxAttempts > 60)
+        {
+            throw Invalid("DatabaseStartup:MaxAttempts", "must not exceed 60");
         }
 
         return options;

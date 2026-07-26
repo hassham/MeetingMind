@@ -144,7 +144,11 @@ describe('MeetingMind workflow', () => {
       },
     })
 
-    expect(await screen.findByText('Upload accepted. Processing has started.')).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'Audio accepted. Transcript and meeting-minutes processing has started.',
+      ),
+    ).toBeInTheDocument()
     expect(screen.getAllByText('planning.mp3').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Uploaded').length).toBeGreaterThan(0)
   })
@@ -247,11 +251,62 @@ describe('MeetingMind workflow', () => {
     render(<App />)
     await screen.findByText('No meeting jobs have been created yet.')
 
-    const selectFile = screen.getByRole('button', { name: 'Select file' })
+    const selectFile = screen.getByRole('button', { name: 'Select audio' })
     selectFile.focus()
     await user.keyboard('{Enter}')
 
     expect(inputClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('switches to transcript upload and posts to the transcript endpoint', async () => {
+    const user = userEvent.setup()
+    const post = vi.spyOn(axios, 'post').mockResolvedValue({
+      data: {
+        jobId,
+        processingMode: 'MinutesFromTranscript',
+        status: 'Queued',
+        stage: 'Uploaded',
+      },
+    })
+    server.use(
+      http.get('*/api/meetings/:id/status', () =>
+        HttpResponse.json({
+          jobId,
+          status: 'Queued',
+          stage: 'Uploaded',
+          progress: 0,
+          errorCode: null,
+          errorMessage: null,
+          automaticRetryCount: 0,
+          automaticRetryLimit: 2,
+          nextRetryAt: null,
+          processingDurationSeconds: 0,
+          totalDurationSeconds: 0,
+        }),
+      ),
+    )
+    render(<App />)
+    await screen.findByText('No meeting jobs have been created yet.')
+
+    await user.click(
+      screen.getByRole('radio', { name: 'Transcript → meeting minutes' }),
+    )
+    expect(screen.getByRole('button', { name: 'Select transcript' })).toBeInTheDocument()
+
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')
+    expect(input).toHaveAttribute('accept', '.txt,.md,text/plain,text/markdown')
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(['Meeting notes'], 'notes.md', { type: 'text/markdown' })],
+      },
+    })
+
+    expect(
+      await screen.findByText(
+        'Transcript accepted. Meeting-minutes generation has started.',
+      ),
+    ).toBeInTheDocument()
+    expect(post).toHaveBeenCalledWith('/api/meetings/transcript', expect.any(FormData))
   })
 
   it('shows an actionable retry error returned by the API', async () => {

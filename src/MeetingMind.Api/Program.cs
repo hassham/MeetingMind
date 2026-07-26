@@ -13,6 +13,9 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+var localSettingsPath = MeetingMindConfiguration.GetRepositoryLocalSettingsPath(
+    builder.Environment.ContentRootPath);
+builder.Configuration.AddJsonFile(localSettingsPath, optional: true, reloadOnChange: true);
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -35,6 +38,11 @@ var transcriptionOptions = builder.Configuration
     .GetSection("Transcription")
     .Get<TranscriptionOptions>() ?? new TranscriptionOptions();
 builder.Services.AddSingleton(transcriptionOptions);
+
+var databaseStartupOptions = MeetingMindConfiguration.ValidateDatabaseStartupOptions(
+    builder.Configuration.GetSection("DatabaseStartup").Get<DatabaseStartupOptions>()
+        ?? new DatabaseStartupOptions());
+builder.Services.AddSingleton(databaseStartupOptions);
 
 builder.Services.Configure<FormOptions>(options =>
 {
@@ -72,6 +80,14 @@ builder.Services.AddScoped<IMeetingRetryService, MeetingRetryService>();
 builder.Services.AddScoped<IMeetingHistoryService, MeetingHistoryService>();
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    await DevelopmentDatabaseStartup.MigrateApiAsync(
+        app.Services,
+        databaseStartupOptions,
+        app.Logger);
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

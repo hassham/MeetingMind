@@ -26,6 +26,26 @@ public sealed class LocalFileStorageSafetyTests : IDisposable
         Assert.True(File.Exists(outsidePath));
     }
 
+    [Fact]
+    public async Task TranscriptStorageWritesNormalizedContentWithoutUtf8Bom()
+    {
+        var rootPath = Path.Combine(_parentPath, "storage");
+        var service = new LocalFileStorageService(new StorageOptions { RootPath = rootPath });
+        var transcript = "First paragraph\n\nSecond paragraph";
+
+        var path = await service.SaveTranscriptAsync(
+            Guid.NewGuid(),
+            transcript,
+            CancellationToken.None);
+        await using var stored = await service.ReadAsync(path, CancellationToken.None);
+        using var buffer = new MemoryStream();
+        await stored.CopyToAsync(buffer);
+        var bytes = buffer.ToArray();
+
+        Assert.False(bytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }));
+        Assert.Equal(transcript, System.Text.Encoding.UTF8.GetString(bytes));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_parentPath))

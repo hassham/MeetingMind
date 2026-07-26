@@ -15,7 +15,11 @@ import {
   Container,
   CssBaseline,
   Divider,
+  FormControl,
+  FormControlLabel,
   LinearProgress,
+  Radio,
+  RadioGroup,
   Stack,
   Tab,
   Tabs,
@@ -29,12 +33,14 @@ import './App.css'
 
 type UploadResponse = {
   jobId: string
+  processingMode?: string
   status: string
   stage: string
 }
 
 type JobStatusResponse = {
   jobId: string
+  processingMode?: string
   status: string
   stage: string
   progress: number
@@ -43,6 +49,7 @@ type JobStatusResponse = {
   automaticRetryCount: number
   automaticRetryLimit: number
   nextRetryAt: string | null
+  sourceAudioDurationSeconds?: number | null
   processingDurationSeconds: number
   totalDurationSeconds: number
 }
@@ -50,6 +57,7 @@ type JobStatusResponse = {
 type HistoryItem = {
   jobId: string
   originalFileName: string
+  processingMode?: string
   status: string
   stage: string
   progress: number
@@ -62,6 +70,7 @@ type HistoryItem = {
   updatedAt: string
   startedAt: string | null
   completedAt: string | null
+  sourceAudioDurationSeconds?: number | null
   processingDurationSeconds: number
   totalDurationSeconds: number
 }
@@ -84,6 +93,7 @@ function mergeStatusIntoHistoryItem(
   return {
     ...item,
     status: status.status,
+    processingMode: status.processingMode ?? item.processingMode,
     stage: status.stage,
     progress: status.progress,
     errorCode: status.errorCode,
@@ -91,6 +101,8 @@ function mergeStatusIntoHistoryItem(
     automaticRetryCount: status.automaticRetryCount,
     automaticRetryLimit: status.automaticRetryLimit,
     nextRetryAt: status.nextRetryAt,
+    sourceAudioDurationSeconds:
+      status.sourceAudioDurationSeconds ?? item.sourceAudioDurationSeconds,
     processingDurationSeconds: status.processingDurationSeconds,
     totalDurationSeconds: status.totalDurationSeconds,
   }
@@ -142,6 +154,7 @@ const theme = createTheme({
 const activeStatuses = new Set(['Queued', 'Processing'])
 const retryableStatuses = new Set(['Failed', 'Cancelled'])
 const historyPageSize = 20
+type CreationMode = 'FullMeeting' | 'TranscriptOnly' | 'MinutesFromTranscript'
 
 function App() {
   const [history, setHistory] = useState<HistoryItem[]>([])
@@ -153,6 +166,7 @@ function App() {
   const [transcript, setTranscript] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
+  const [creationMode, setCreationMode] = useState<CreationMode>('FullMeeting')
   const [isHistoryLoading, setIsHistoryLoading] = useState(false)
   const [isResultLoading, setIsResultLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -273,6 +287,7 @@ function App() {
     setSelectedHistoryItem(item)
     setSelectedJob({
       jobId: item.jobId,
+      processingMode: item.processingMode,
       status: item.status,
       stage: item.stage,
       progress: item.progress,
@@ -281,6 +296,7 @@ function App() {
       automaticRetryCount: item.automaticRetryCount,
       automaticRetryLimit: item.automaticRetryLimit,
       nextRetryAt: item.nextRetryAt,
+      sourceAudioDurationSeconds: item.sourceAudioDurationSeconds,
       processingDurationSeconds: item.processingDurationSeconds,
       totalDurationSeconds: item.totalDurationSeconds,
     })
@@ -305,6 +321,10 @@ function App() {
 
     const formData = new FormData()
     formData.append('file', file)
+    const isTranscriptUpload = creationMode === 'MinutesFromTranscript'
+    if (!isTranscriptUpload) {
+      formData.append('mode', creationMode)
+    }
     setIsUploading(true)
     setMinutes(null)
     setTranscript(null)
@@ -312,11 +332,15 @@ function App() {
     setError(null)
 
     try {
-      const response = await axios.post<UploadResponse>('/api/meetings/upload', formData)
+      const endpoint = isTranscriptUpload
+        ? '/api/meetings/transcript'
+        : '/api/meetings/audio'
+      const response = await axios.post<UploadResponse>(endpoint, formData)
       const job = response.data
       setSelectedHistoryItem({
         jobId: job.jobId,
         originalFileName: file.name,
+        processingMode: job.processingMode ?? creationMode,
         status: job.status,
         stage: job.stage,
         progress: 0,
@@ -325,6 +349,7 @@ function App() {
         automaticRetryCount: 0,
         automaticRetryLimit: 0,
         nextRetryAt: null,
+        sourceAudioDurationSeconds: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         startedAt: null,
@@ -334,6 +359,7 @@ function App() {
       })
       setSelectedJob({
         jobId: job.jobId,
+        processingMode: job.processingMode ?? creationMode,
         status: job.status,
         stage: job.stage,
         progress: 0,
@@ -342,11 +368,18 @@ function App() {
         automaticRetryCount: 0,
         automaticRetryLimit: 0,
         nextRetryAt: null,
+        sourceAudioDurationSeconds: null,
         processingDurationSeconds: 0,
         totalDurationSeconds: 0,
       })
       setLiveDurationOffsetSeconds(0)
-      setMessage('Upload accepted. Processing has started.')
+      setMessage(
+        creationMode === 'TranscriptOnly'
+          ? 'Audio accepted. Transcription has started.'
+          : creationMode === 'MinutesFromTranscript'
+            ? 'Transcript accepted. Meeting-minutes generation has started.'
+            : 'Audio accepted. Transcript and meeting-minutes processing has started.',
+      )
       setHistoryPage(0)
       await loadHistory(0)
       await loadStatus(job.jobId)
@@ -370,6 +403,7 @@ function App() {
           : history.find((item) => item.jobId === jobId)
       setSelectedJob({
         jobId: response.data.jobId,
+        processingMode: previousJob?.processingMode,
         status: response.data.status,
         stage: response.data.stage,
         progress: 0,
@@ -378,6 +412,7 @@ function App() {
         automaticRetryCount: 0,
         automaticRetryLimit: previousJob?.automaticRetryLimit ?? 0,
         nextRetryAt: null,
+        sourceAudioDurationSeconds: previousJob?.sourceAudioDurationSeconds,
         processingDurationSeconds: previousJob?.processingDurationSeconds ?? 0,
         totalDurationSeconds: previousJob?.totalDurationSeconds ?? 0,
       })
@@ -489,6 +524,11 @@ function App() {
                 <FileUploadButton
                   label="Upload"
                   isUploading={isUploading}
+                  accept={
+                    creationMode === 'MinutesFromTranscript'
+                      ? '.txt,.md,text/plain,text/markdown'
+                      : '.mp3,.wav,.m4a,.aac,audio/mpeg,audio/wav,audio/mp4,audio/aac'
+                  }
                   onUpload={handleUpload}
                 />
               </Stack>
@@ -624,7 +664,12 @@ function App() {
               </Box>
 
               <Box className="detail-stack">
-                <UploadPanel isUploading={isUploading} onUpload={handleUpload} />
+                <UploadPanel
+                  mode={creationMode}
+                  isUploading={isUploading}
+                  onModeChange={setCreationMode}
+                  onUpload={handleUpload}
+                />
                 <Box className="surface">
                   {selectedJob ? (
                     <Stack spacing={2.5}>
@@ -735,6 +780,18 @@ function App() {
                         <AccordionDetails id="processing-details-content">
                           <Stack className="metadata-grid">
                             <Metadata
+                              label="Workflow"
+                              value={formatProcessingMode(selectedJob.processingMode)}
+                            />
+                            <Metadata
+                              label="Source audio"
+                              value={
+                                selectedJob.sourceAudioDurationSeconds == null
+                                  ? '-'
+                                  : formatDuration(selectedJob.sourceAudioDurationSeconds)
+                              }
+                            />
+                            <Metadata
                               label="Processing duration"
                               value={formatDuration(selectedProcessingDurationSeconds)}
                             />
@@ -837,32 +894,87 @@ function App() {
 }
 
 function UploadPanel({
+  mode,
   isUploading,
+  onModeChange,
   onUpload,
 }: {
+  mode: CreationMode
   isUploading: boolean
+  onModeChange: (mode: CreationMode) => void
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void
 }) {
+  const isTranscriptUpload = mode === 'MinutesFromTranscript'
+  const guidance =
+    mode === 'TranscriptOnly'
+      ? {
+          title: 'Transcribe audio',
+          detail: 'Creates a transcript only. MP3, WAV, M4A, or AAC.',
+        }
+      : mode === 'MinutesFromTranscript'
+        ? {
+            title: 'Create minutes from transcript',
+            detail: 'Creates meeting minutes from a UTF-8 TXT or Markdown file.',
+          }
+        : {
+            title: 'Transcribe audio and create minutes',
+            detail: 'Creates both outputs. MP3, WAV, M4A, or AAC.',
+          }
+
   return (
     <Box className="upload-panel">
-      <Stack
-        direction={{ xs: 'column', md: 'row' }}
-        justifyContent="space-between"
-        alignItems={{ xs: 'stretch', md: 'center' }}
-        spacing={2}
-      >
+      <Stack spacing={2}>
+        <Box>
+          <Typography component="h2" variant="h6" fontWeight={700}>
+            New processing job
+          </Typography>
+          <Typography color="text.secondary">
+            Choose the output you need, then select its source file.
+          </Typography>
+        </Box>
+        <FormControl>
+          <RadioGroup
+            aria-label="Processing workflow"
+            value={mode}
+            onChange={(event) => onModeChange(event.target.value as CreationMode)}
+          >
+            <FormControlLabel
+              value="FullMeeting"
+              control={<Radio />}
+              label="Audio → transcript and meeting minutes"
+              disabled={isUploading}
+            />
+            <FormControlLabel
+              value="TranscriptOnly"
+              control={<Radio />}
+              label="Audio → transcript only"
+              disabled={isUploading}
+            />
+            <FormControlLabel
+              value="MinutesFromTranscript"
+              control={<Radio />}
+              label="Transcript → meeting minutes"
+              disabled={isUploading}
+            />
+          </RadioGroup>
+        </FormControl>
         <Stack direction="row" spacing={2} alignItems="center">
           <Box className="upload-icon">
             <CloudUploadOutlinedIcon color="primary" />
           </Box>
           <Box>
-            <Typography fontWeight={700}>Upload meeting audio</Typography>
-            <Typography color="text.secondary">MP3, WAV, M4A, AAC</Typography>
+            <Typography fontWeight={700}>{guidance.title}</Typography>
+            <Typography color="text.secondary">{guidance.detail}</Typography>
           </Box>
         </Stack>
         <FileUploadButton
-          label="Select file"
+          label={isTranscriptUpload ? 'Select transcript' : 'Select audio'}
           isUploading={isUploading}
+          accept={
+            isTranscriptUpload
+              ? '.txt,.md,text/plain,text/markdown'
+              : '.mp3,.wav,.m4a,.aac,audio/mpeg,audio/wav,audio/mp4,audio/aac'
+          }
           onUpload={onUpload}
         />
       </Stack>
@@ -873,10 +985,12 @@ function UploadPanel({
 function FileUploadButton({
   label,
   isUploading,
+  accept,
   onUpload,
 }: {
   label: string
   isUploading: boolean
+  accept: string
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -895,7 +1009,7 @@ function FileUploadButton({
         ref={inputRef}
         hidden
         type="file"
-        accept=".mp3,.wav,.m4a,.aac,audio/mpeg,audio/wav,audio/mp4,audio/aac"
+        accept={accept}
         onChange={(event) => onUpload(event)}
       />
     </>
@@ -1092,6 +1206,19 @@ function formatDate(value: string | null | undefined) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
+}
+
+function formatProcessingMode(mode: string | undefined) {
+  switch (mode) {
+    case 'TranscriptOnly':
+      return 'Audio to transcript'
+    case 'MinutesFromTranscript':
+      return 'Transcript to minutes'
+    case 'FullMeeting':
+      return 'Audio to transcript and minutes'
+    default:
+      return '-'
+  }
 }
 
 function formatRetryCountdown(nextRetryAt: string) {

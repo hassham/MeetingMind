@@ -139,6 +139,12 @@ public class MeetingStatusServiceTests
             throw new NotSupportedException();
         }
 
+        public Task SetAudioProcessingResultAsync(
+            Guid meetingJobId,
+            string processedFilePath,
+            long sourceAudioDurationSeconds,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task BeginProcessingAsync(Guid meetingJobId, int automaticRetryLimit, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();

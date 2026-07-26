@@ -16,6 +16,9 @@ using Microsoft.EntityFrameworkCore;
 using MeetingMind.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);
+var localSettingsPath = MeetingMindConfiguration.GetRepositoryLocalSettingsPath(
+    builder.Environment.ContentRootPath);
+builder.Configuration.AddJsonFile(localSettingsPath, optional: true, reloadOnChange: true);
 
 var connectionString = MeetingMindConfiguration.GetConnectionString(builder.Configuration);
 
@@ -53,6 +56,11 @@ var storageRetentionOptions = MeetingMindConfiguration.ValidateStorageRetentionO
         ?? new StorageRetentionOptions());
 builder.Services.AddSingleton(storageRetentionOptions);
 
+var databaseStartupOptions = MeetingMindConfiguration.ValidateDatabaseStartupOptions(
+    builder.Configuration.GetSection("DatabaseStartup").Get<DatabaseStartupOptions>()
+        ?? new DatabaseStartupOptions());
+builder.Services.AddSingleton(databaseStartupOptions);
+
 GlobalJobFilters.Filters.Remove<AutomaticRetryAttribute>();
 GlobalJobFilters.Filters.Add(MeetingAutomaticRetryConfiguration.CreateFilter(automaticRetryOptions));
 
@@ -86,6 +94,14 @@ builder.Services.AddScoped<IStorageRetentionService, StorageRetentionService>();
 builder.Services.AddScoped<IStorageRetentionJob, StorageRetentionJob>();
 
 var host = builder.Build();
+
+if (builder.Environment.IsDevelopment())
+{
+    await DevelopmentDatabaseStartup.WaitForWorkerSchemaAsync(
+        host.Services,
+        databaseStartupOptions,
+        host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup"));
+}
 
 const string retentionJobId = "meetingmind-storage-retention";
 using (var scope = host.Services.CreateScope())

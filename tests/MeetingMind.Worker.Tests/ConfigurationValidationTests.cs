@@ -95,6 +95,62 @@ public sealed class ConfigurationValidationTests : IDisposable
         Assert.Contains("Storage:MaxUploadSizeMb", exception.Message);
     }
 
+    [Theory]
+    [InlineData(true, "Storage:MaxTranscriptUploadSizeMb")]
+    [InlineData(false, "Storage:MaxTranscriptCharacters")]
+    public void InvalidTranscriptLimitsNameTheSetting(bool sizeLimit, string settingName)
+    {
+        var options = CreateStorageOptions();
+        if (sizeLimit)
+        {
+            options.MaxTranscriptUploadSizeMb = 0;
+        }
+        else
+        {
+            options.MaxTranscriptCharacters = 0;
+        }
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            MeetingMindConfiguration.ValidateStorageOptions(options));
+
+        Assert.Contains(settingName, exception.Message);
+    }
+
+    [Theory]
+    [InlineData(0, 2, "DatabaseStartup:MaxAttempts")]
+    [InlineData(15, 0, "DatabaseStartup:DelaySeconds")]
+    [InlineData(61, 2, "DatabaseStartup:MaxAttempts")]
+    public void InvalidDatabaseStartupSettingsNameTheSetting(
+        int maxAttempts,
+        int delaySeconds,
+        string settingName)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            MeetingMindConfiguration.ValidateDatabaseStartupOptions(
+                new DatabaseStartupOptions
+                {
+                    MaxAttempts = maxAttempts,
+                    DelaySeconds = delaySeconds
+                }));
+
+        Assert.Contains(settingName, exception.Message);
+    }
+
+    [Fact]
+    public void RepositoryLocalSettingsPathIsStableFromProjectOrRepositoryRoot()
+    {
+        var repositoryRoot = Path.GetDirectoryName(
+            MeetingMindConfiguration.GetRepositoryLocalSettingsPath(AppContext.BaseDirectory))!;
+        var projectRoot = Path.Combine(repositoryRoot, "src", "MeetingMind.Worker");
+
+        var fromRepository = MeetingMindConfiguration.GetRepositoryLocalSettingsPath(
+            repositoryRoot);
+        var fromProject = MeetingMindConfiguration.GetRepositoryLocalSettingsPath(projectRoot);
+
+        Assert.Equal(Path.Combine(repositoryRoot, "appsettings.Local.json"), fromRepository);
+        Assert.Equal(fromRepository, fromProject);
+    }
+
     [Fact]
     public void MissingFfmpegPathNamesTheSetting()
     {

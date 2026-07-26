@@ -438,13 +438,14 @@ public class MeetingProcessingJob : IMeetingProcessingJob
             errorMessage: null,
             CancellationToken.None);
 
-        var processedFilePath = await _audioProcessingService.ConvertToStandardFormatAsync(
+        var audioProcessingResult = await _audioProcessingService.ConvertToStandardFormatAsync(
             meetingJob.OriginalFilePath,
             CancellationToken.None);
 
-        await _meetingJobRepository.SetProcessedFilePathAsync(
+        await _meetingJobRepository.SetAudioProcessingResultAsync(
             jobId,
-            processedFilePath,
+            audioProcessingResult.ProcessedFilePath,
+            audioProcessingResult.SourceDurationSeconds,
             CancellationToken.None);
 
         LogStageOutcome(
@@ -456,7 +457,7 @@ public class MeetingProcessingJob : IMeetingProcessingJob
             attemptNumber,
             stageStarted);
 
-        return processedFilePath;
+        return audioProcessingResult.ProcessedFilePath;
     }
 
     private void LogStageOutcome(
