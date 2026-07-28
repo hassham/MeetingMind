@@ -19,6 +19,8 @@ public class MeetingProcessingJob : IMeetingProcessingJob
     private readonly IMeetingJobRepository _meetingJobRepository;
     private readonly ITranscriptionService _transcriptionService;
     private readonly IMeetingMinutesService _meetingMinutesService;
+    private readonly TranscriptFormatter _transcriptFormatter;
+    private readonly TranscriptFormattingOptions _transcriptFormattingOptions;
     private readonly IMeetingFailureClassifier _failureClassifier;
     private readonly AutomaticRetryOptions _retryOptions;
     private readonly TimeProvider _timeProvider;
@@ -30,6 +32,8 @@ public class MeetingProcessingJob : IMeetingProcessingJob
         IMeetingJobRepository meetingJobRepository,
         ITranscriptionService transcriptionService,
         IMeetingMinutesService meetingMinutesService,
+        TranscriptFormatter transcriptFormatter,
+        TranscriptFormattingOptions transcriptFormattingOptions,
         IMeetingFailureClassifier failureClassifier,
         AutomaticRetryOptions retryOptions,
         TimeProvider timeProvider)
@@ -40,6 +44,8 @@ public class MeetingProcessingJob : IMeetingProcessingJob
         _meetingJobRepository = meetingJobRepository;
         _transcriptionService = transcriptionService;
         _meetingMinutesService = meetingMinutesService;
+        _transcriptFormatter = transcriptFormatter;
+        _transcriptFormattingOptions = transcriptFormattingOptions;
         _failureClassifier = failureClassifier;
         _retryOptions = retryOptions;
         _timeProvider = timeProvider;
@@ -104,7 +110,7 @@ public class MeetingProcessingJob : IMeetingProcessingJob
 
             if (transcript is not null)
             {
-                transcriptText = transcript.TranscriptText;
+                transcriptText = transcript.Text;
                 LogStageOutcome(
                     LogLevel.Information,
                     jobId,
@@ -134,19 +140,33 @@ public class MeetingProcessingJob : IMeetingProcessingJob
                     errorMessage: null,
                     CancellationToken.None);
 
-                transcriptText = await _transcriptionService.TranscribeAsync(
+                var transcriptionResult = await _transcriptionService.TranscribeAsync(
                     processedFilePath,
                     CancellationToken.None);
+                var formattedTranscript = _transcriptFormatter.Format(
+                    transcriptionResult,
+                    _transcriptFormattingOptions.ToSnapshot());
+                if (string.IsNullOrWhiteSpace(formattedTranscript.Text))
+                {
+                    throw new PermanentMeetingProcessingException(
+                        "Whisper did not return any recognized transcript text.");
+                }
+
+                transcriptText = formattedTranscript.Text;
 
                 var transcriptFilePath = await _fileStorageService.SaveTranscriptAsync(
                     jobId,
                     transcriptText,
                     CancellationToken.None);
 
-                await _meetingJobRepository.SaveTranscriptAsync(
+                await _meetingJobRepository.SaveStructuredTranscriptAsync(
                     jobId,
                     transcriptText,
                     transcriptFilePath,
+                    new StructuredTranscriptCheckpoint(
+                        transcriptionResult.Segments,
+                        formattedTranscript.Paragraphs,
+                        formattedTranscript.Formatting),
                     CancellationToken.None);
 
                 LogStageOutcome(
@@ -384,7 +404,7 @@ public class MeetingProcessingJob : IMeetingProcessingJob
             attemptStarted);
     }
 
-    private async Task<MeetingTranscript?> GetValidTranscriptCheckpointAsync(Guid jobId)
+    private async Task<TranscriptCheckpoint?> GetValidTranscriptCheckpointAsync(Guid jobId)
     {
         var transcript = await _meetingJobRepository.GetTranscriptByJobIdAsync(
             jobId,
@@ -397,11 +417,61 @@ public class MeetingProcessingJob : IMeetingProcessingJob
             return null;
         }
 
-        return await _fileStorageService.ExistsAsync(
-            transcript.TranscriptFilePath,
-            CancellationToken.None)
-            ? transcript
-            : null;
+        var structured = await _meetingJobRepository.GetStructuredTranscriptCheckpointAsync(
+            jobId,
+            CancellationToken.None);
+        if (structured is not null)
+        {
+            var rerendered = _transcriptFormatter.Format(
+                new TranscriptionResult(structured.Segments),
+                structured.Formatting);
+            if (string.IsNullOrWhiteSpace(rerendered.Text))
+            {
+                throw new PermanentMeetingProcessingException(
+                    "The stored structured transcript checkpoint contains no recognized text.");
+            }
+
+            var fileExists = await _fileStorageService.ExistsAsync(
+                transcript.TranscriptFilePath,
+                CancellationToken.None);
+            if (!fileExists ||
+                transcript.TranscriptText != rerendered.Text ||
+                !structured.Paragraphs.SequenceEqual(rerendered.Paragraphs))
+            {
+                var transcriptFilePath = await _fileStorageService.SaveTranscriptAsync(
+                    jobId,
+                    rerendered.Text,
+                    CancellationToken.None);
+                await _meetingJobRepository.SaveStructuredTranscriptAsync(
+                    jobId,
+                    rerendered.Text,
+                    transcriptFilePath,
+                    new StructuredTranscriptCheckpoint(
+                        structured.Segments,
+                        rerendered.Paragraphs,
+                        structured.Formatting),
+                    CancellationToken.None);
+            }
+
+            return new TranscriptCheckpoint(rerendered.Text);
+        }
+
+        if (!await _fileStorageService.ExistsAsync(
+                transcript.TranscriptFilePath,
+                CancellationToken.None))
+        {
+            var restoredPath = await _fileStorageService.SaveTranscriptAsync(
+                jobId,
+                transcript.TranscriptText,
+                CancellationToken.None);
+            await _meetingJobRepository.SaveTranscriptAsync(
+                jobId,
+                transcript.TranscriptText,
+                restoredPath,
+                CancellationToken.None);
+        }
+
+        return new TranscriptCheckpoint(transcript.TranscriptText);
     }
 
     private async Task<string> GetOrCreateProcessedAudioAsync(
@@ -541,4 +611,6 @@ public class MeetingProcessingJob : IMeetingProcessingJob
             CreatedAt = DateTimeOffset.UtcNow
         };
     }
+
+    private sealed record TranscriptCheckpoint(string Text);
 }

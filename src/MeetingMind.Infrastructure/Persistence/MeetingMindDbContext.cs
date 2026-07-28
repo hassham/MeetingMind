@@ -81,6 +81,10 @@ namespace MeetingMind.Infrastructure.Persistence
                 entity.HasKey(transcript => transcript.Id);
                 entity.Property(transcript => transcript.TranscriptText).IsRequired();
                 entity.Property(transcript => transcript.TranscriptFilePath).HasMaxLength(1024);
+                entity.Property(transcript => transcript.SegmentsJson);
+                entity.Property(transcript => transcript.ParagraphsJson);
+                entity.Property(transcript => transcript.FormattingVersion).HasMaxLength(32);
+                entity.Property(transcript => transcript.FormattingConfigurationJson);
                 entity.Property(transcript => transcript.CreatedAt).IsRequired();
                 entity.HasIndex(transcript => transcript.MeetingJobId).IsUnique();
             });

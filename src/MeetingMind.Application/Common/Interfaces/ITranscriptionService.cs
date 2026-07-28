@@ -2,5 +2,7 @@ namespace MeetingMind.Application.Common.Interfaces;
 
 public interface ITranscriptionService
 {
-    Task<string> TranscribeAsync(string audioPath, CancellationToken cancellationToken);
+    Task<MeetingMind.Application.Meetings.TranscriptionResult> TranscribeAsync(
+        string audioPath,
+        CancellationToken cancellationToken);
 }

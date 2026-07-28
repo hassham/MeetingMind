@@ -1,10 +1,10 @@
-using System.Text;
 using FFMpegCore;
 using MeetingMind.Application.Common.Interfaces;
 using MeetingMind.Application.Common.Options;
 using MeetingMind.Application.Common.Exceptions;
 using Whisper.net;
 using Whisper.net.Ggml;
+using MeetingMind.Application.Meetings;
 
 namespace MeetingMind.Infrastructure.Transcription;
 
@@ -23,7 +23,9 @@ public class WhisperNetTranscriptionService : ITranscriptionService
         _transcriptionOptions = transcriptionOptions;
     }
 
-    public async Task<string> TranscribeAsync(string audioPath, CancellationToken cancellationToken)
+    public async Task<TranscriptionResult> TranscribeAsync(
+        string audioPath,
+        CancellationToken cancellationToken)
     {
         var audioFullPath = GetSafeStorageFullPath(audioPath);
         if (!File.Exists(audioFullPath))
@@ -41,13 +43,16 @@ public class WhisperNetTranscriptionService : ITranscriptionService
             using var processor = CreateProcessor(whisperFactory);
             await using var audioStream = File.OpenRead(audioFullPath);
 
-            var transcript = new StringBuilder();
+            var segments = new List<TranscriptionSegment>();
             await foreach (var segment in processor.ProcessAsync(audioStream, cancellationToken))
             {
-                transcript.Append(segment.Text);
+                segments.Add(new TranscriptionSegment(
+                    segment.Start,
+                    segment.End,
+                    NormalizeText(segment.Text)));
             }
 
-            return CleanTranscript(transcript.ToString());
+            return new TranscriptionResult(segments);
         }
         catch (Exception exception) when (exception is not IOException and
                                           not OperationCanceledException and
@@ -188,7 +193,7 @@ public class WhisperNetTranscriptionService : ITranscriptionService
         }
     }
 
-    private static string CleanTranscript(string transcript)
+    private static string NormalizeText(string transcript)
     {
         return transcript
             .Replace("\r\n", "\n")

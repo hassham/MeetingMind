@@ -1,5 +1,6 @@
 using MeetingMind.Domain.Entities;
 using MeetingMind.Domain.Enums;
+using MeetingMind.Application.Meetings;
 
 namespace MeetingMind.Application.Common.Interfaces;
 
@@ -10,6 +11,10 @@ public interface IMeetingJobRepository
     Task<MeetingJob?> GetByIdAsync(Guid meetingJobId, CancellationToken cancellationToken);
 
     Task<MeetingTranscript?> GetTranscriptByJobIdAsync(Guid meetingJobId, CancellationToken cancellationToken);
+
+    Task<StructuredTranscriptCheckpoint?> GetStructuredTranscriptCheckpointAsync(
+        Guid meetingJobId,
+        CancellationToken cancellationToken) => Task.FromResult<StructuredTranscriptCheckpoint?>(null);
 
     Task<MeetingMinutes?> GetMinutesByJobIdAsync(Guid meetingJobId, CancellationToken cancellationToken);
 
@@ -32,6 +37,18 @@ public interface IMeetingJobRepository
         string transcriptText,
         string transcriptFilePath,
         CancellationToken cancellationToken);
+
+    Task SaveStructuredTranscriptAsync(
+        Guid meetingJobId,
+        string transcriptText,
+        string transcriptFilePath,
+        StructuredTranscriptCheckpoint checkpoint,
+        CancellationToken cancellationToken) =>
+        SaveTranscriptAsync(
+            meetingJobId,
+            transcriptText,
+            transcriptFilePath,
+            cancellationToken);
 
     Task SaveMinutesAsync(
         Guid meetingJobId,

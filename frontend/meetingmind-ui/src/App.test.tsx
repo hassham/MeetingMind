@@ -95,12 +95,27 @@ function minutesResult() {
   }
 }
 
+function transcriptResult(hasTimestamps = false) {
+  return {
+    jobId,
+    hasTimestamps,
+    formattingVersion: hasTimestamps ? 'v1' : null,
+    paragraphs: [
+      {
+        text: 'Transcript content',
+        startSeconds: hasTimestamps ? 65 : null,
+        endSeconds: hasTimestamps ? 70 : null,
+      },
+    ],
+  }
+}
+
 function useCompletedResultHandlers() {
   server.use(
     http.get('*/api/meetings/:id/status', () => HttpResponse.json(completedStatus())),
     http.get('*/api/meetings/:id/result', () => HttpResponse.json(minutesResult())),
-    http.get('*/api/meetings/:id/transcript/download', () =>
-      HttpResponse.text('Transcript content'),
+    http.get('*/api/meetings/:id/transcript', () =>
+      HttpResponse.json(transcriptResult()),
     ),
   )
 }
@@ -194,6 +209,26 @@ describe('MeetingMind workflow', () => {
     )
 
     await user.click(screen.getByRole('tab', { name: 'Transcript' }))
+    expect(screen.getByText('Transcript content')).toBeInTheDocument()
+    expect(screen.queryByText('[00:01:05]')).not.toBeInTheDocument()
+  })
+
+  it('shows structured transcript paragraphs with hh:mm:ss timestamps', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.get('*/api/meetings/history', () => HttpResponse.json(historyResponse())),
+      http.get('*/api/meetings/:id/status', () => HttpResponse.json(completedStatus())),
+      http.get('*/api/meetings/:id/result', () => HttpResponse.json(minutesResult())),
+      http.get('*/api/meetings/:id/transcript', () =>
+        HttpResponse.json(transcriptResult(true)),
+      ),
+    )
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /planning\.mp3/i }))
+    await user.click(screen.getByRole('tab', { name: 'Transcript' }))
+
+    expect(screen.getByText('[00:01:05]')).toBeInTheDocument()
     expect(screen.getByText('Transcript content')).toBeInTheDocument()
   })
 
@@ -339,7 +374,7 @@ describe('MeetingMind workflow', () => {
       http.get('*/api/meetings/:id/result', () =>
         HttpResponse.json({ error: 'Meeting minutes not found.' }, { status: 404 }),
       ),
-      http.get('*/api/meetings/:id/transcript/download', () =>
+      http.get('*/api/meetings/:id/transcript', () =>
         HttpResponse.json({ error: 'Meeting transcript not found.' }, { status: 404 }),
       ),
     )
@@ -383,8 +418,8 @@ describe('MeetingMind workflow', () => {
         )
       }),
       http.get('*/api/meetings/:id/result', () => HttpResponse.json(minutesResult())),
-      http.get('*/api/meetings/:id/transcript/download', () =>
-        HttpResponse.text('Transcript content'),
+      http.get('*/api/meetings/:id/transcript', () =>
+        HttpResponse.json(transcriptResult()),
       ),
     )
     render(<App />)
@@ -440,8 +475,8 @@ describe('MeetingMind workflow', () => {
         }),
       ),
       http.get('*/api/meetings/:id/result', () => HttpResponse.json(minutesResult())),
-      http.get('*/api/meetings/:id/transcript/download', () =>
-        HttpResponse.text('Transcript content'),
+      http.get('*/api/meetings/:id/transcript', () =>
+        HttpResponse.json(transcriptResult()),
       ),
     )
     render(<App />)

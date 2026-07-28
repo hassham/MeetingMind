@@ -61,6 +61,11 @@ var databaseStartupOptions = MeetingMindConfiguration.ValidateDatabaseStartupOpt
         ?? new DatabaseStartupOptions());
 builder.Services.AddSingleton(databaseStartupOptions);
 
+var transcriptFormattingOptions = MeetingMindConfiguration.ValidateTranscriptFormattingOptions(
+    builder.Configuration.GetSection("TranscriptFormatting").Get<TranscriptFormattingOptions>()
+        ?? new TranscriptFormattingOptions());
+builder.Services.AddSingleton(transcriptFormattingOptions);
+
 GlobalJobFilters.Filters.Remove<AutomaticRetryAttribute>();
 GlobalJobFilters.Filters.Add(MeetingAutomaticRetryConfiguration.CreateFilter(automaticRetryOptions));
 
@@ -85,6 +90,7 @@ builder.Services.AddScoped<IAudioProcessingService, FfmpegAudioProcessingService
 builder.Services.AddScoped<ITranscriptionService, WhisperNetTranscriptionService>();
 builder.Services.AddScoped<IMeetingMinutesGenerationClient, OpenAiMeetingMinutesGenerationClient>();
 builder.Services.AddSingleton<TranscriptChunker>();
+builder.Services.AddSingleton<TranscriptFormatter>();
 builder.Services.AddSingleton<MeetingMinutesMerger>();
 builder.Services.AddScoped<IMeetingMinutesService, MeetingMinutesService>();
 builder.Services.AddSingleton<IMeetingFailureClassifier, MeetingFailureClassifier>();

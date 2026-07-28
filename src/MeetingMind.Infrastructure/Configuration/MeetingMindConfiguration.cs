@@ -288,6 +288,37 @@ public static class MeetingMindConfiguration
         return options;
     }
 
+    public static TranscriptFormattingOptions ValidateTranscriptFormattingOptions(
+        TranscriptFormattingOptions options)
+    {
+        if (options.SilenceGapSeconds <= 0)
+        {
+            throw Invalid("TranscriptFormatting:SilenceGapSeconds", "must be greater than zero");
+        }
+
+        RequirePositive(
+            options.PreferredParagraphCharacters,
+            "TranscriptFormatting:PreferredParagraphCharacters");
+        RequirePositive(
+            options.HardParagraphCharacters,
+            "TranscriptFormatting:HardParagraphCharacters");
+        if (options.PreferredParagraphCharacters > options.HardParagraphCharacters)
+        {
+            throw Invalid(
+                "TranscriptFormatting:PreferredParagraphCharacters",
+                "must not exceed the hard paragraph limit");
+        }
+
+        if (options.FormattingVersion != TranscriptFormattingOptions.SupportedVersion)
+        {
+            throw Invalid(
+                "TranscriptFormatting:FormattingVersion",
+                $"must be '{TranscriptFormattingOptions.SupportedVersion}'");
+        }
+
+        return options;
+    }
+
     public static StorageRetentionOptions ValidateStorageRetentionOptions(StorageRetentionOptions options)
     {
         RequirePositive(options.RetentionDays, "StorageRetention:RetentionDays");

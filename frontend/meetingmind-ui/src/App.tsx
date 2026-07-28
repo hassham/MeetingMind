@@ -126,6 +126,19 @@ type MinutesResult = {
   nextSteps: string[]
 }
 
+type TranscriptParagraph = {
+  text: string
+  startSeconds: number | null
+  endSeconds: number | null
+}
+
+type TranscriptResult = {
+  jobId: string
+  hasTimestamps: boolean
+  formattingVersion: string | null
+  paragraphs: TranscriptParagraph[]
+}
+
 const theme = createTheme({
   palette: {
     mode: 'light',
@@ -163,7 +176,7 @@ function App() {
   const [selectedJob, setSelectedJob] = useState<JobStatusResponse | null>(null)
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<HistoryItem | null>(null)
   const [minutes, setMinutes] = useState<MinutesResult | null>(null)
-  const [transcript, setTranscript] = useState<string | null>(null)
+  const [transcript, setTranscript] = useState<TranscriptResult | null>(null)
   const [activeTab, setActiveTab] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
   const [creationMode, setCreationMode] = useState<CreationMode>('FullMeeting')
@@ -248,9 +261,7 @@ function App() {
     try {
       const [minutesResponse, transcriptResponse] = await Promise.allSettled([
         axios.get<MinutesResult>(`/api/meetings/${jobId}/result`),
-        axios.get<string>(`/api/meetings/${jobId}/transcript/download`, {
-          responseType: 'text',
-        }),
+        axios.get<TranscriptResult>(`/api/meetings/${jobId}/transcript`),
       ])
 
       setMinutes(minutesResponse.status === 'fulfilled' ? minutesResponse.value.data : null)
@@ -1074,7 +1085,7 @@ function TranscriptPanel({
   onRetry,
 }: {
   isLoading: boolean
-  transcript: string | null
+  transcript: TranscriptResult | null
   status: string
   canRetry: boolean
   onRefresh: () => void
@@ -1096,7 +1107,36 @@ function TranscriptPanel({
     )
   }
 
-  return <Box className="transcript-box">{transcript}</Box>
+  return (
+    <Stack className="transcript-box" spacing={2}>
+      {transcript.paragraphs.map((paragraph, index) => (
+        <Box key={`${paragraph.startSeconds ?? 'untimed'}-${index}`}>
+          {transcript.hasTimestamps && paragraph.startSeconds !== null ? (
+            <Typography
+              component="div"
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontVariantNumeric: 'tabular-nums', mb: 0.5 }}
+            >
+              [{formatTranscriptTimestamp(paragraph.startSeconds)}]
+            </Typography>
+          ) : null}
+          <Typography component="p" sx={{ m: 0, whiteSpace: 'pre-wrap' }}>
+            {paragraph.text}
+          </Typography>
+        </Box>
+      ))}
+    </Stack>
+  )
+}
+
+function formatTranscriptTimestamp(totalSeconds: number): string {
+  const wholeSeconds = Math.max(0, Math.floor(totalSeconds))
+  const hours = Math.floor(wholeSeconds / 3600)
+  const minutes = Math.floor((wholeSeconds % 3600) / 60)
+  const seconds = wholeSeconds % 60
+
+  return [hours, minutes, seconds].map((part) => part.toString().padStart(2, '0')).join(':')
 }
 
 function UnavailableResult({

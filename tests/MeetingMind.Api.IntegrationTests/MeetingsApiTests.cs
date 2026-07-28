@@ -271,16 +271,56 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
 
         var resultResponse = await _factory.Client.GetAsync($"/api/meetings/{job.Id}/result");
         var result = await ReadJsonAsync(resultResponse);
+        var transcriptViewerResponse = await _factory.Client.GetAsync($"/api/meetings/{job.Id}/transcript");
+        var transcriptViewer = await ReadJsonAsync(transcriptViewerResponse);
         var transcriptResponse = await _factory.Client.GetAsync($"/api/meetings/{job.Id}/transcript/download");
         var minutesResponse = await _factory.Client.GetAsync($"/api/meetings/{job.Id}/minutes/download");
 
         Assert.Equal(HttpStatusCode.OK, resultResponse.StatusCode);
         Assert.Equal("Planning", result.RootElement.GetProperty("title").GetString());
         Assert.Equal("Approve scope", result.RootElement.GetProperty("decisions")[0].GetString());
+        Assert.Equal(HttpStatusCode.OK, transcriptViewerResponse.StatusCode);
+        Assert.False(transcriptViewer.RootElement.GetProperty("hasTimestamps").GetBoolean());
+        Assert.Equal("Meeting transcript", transcriptViewer.RootElement.GetProperty("paragraphs")[0].GetProperty("text").GetString());
+        Assert.Equal(JsonValueKind.Null, transcriptViewer.RootElement.GetProperty("paragraphs")[0].GetProperty("startSeconds").ValueKind);
         Assert.Equal("Meeting transcript", await transcriptResponse.Content.ReadAsStringAsync());
         Assert.Equal("# Planning\n\nSummary", await minutesResponse.Content.ReadAsStringAsync());
         Assert.Equal("text/plain", transcriptResponse.Content.Headers.ContentType?.MediaType);
         Assert.Equal("text/markdown", minutesResponse.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task StructuredTranscriptViewerReturnsTimedParagraphs()
+    {
+        await _factory.ResetAsync();
+        var job = CreateJob(MeetingJobStatus.Completed, MeetingJobStage.Completed, 100);
+        var paragraphs = new[]
+        {
+            new TranscriptParagraph("Opening discussion.", TimeSpan.FromSeconds(65), TimeSpan.FromSeconds(72))
+        };
+        var formatting = new TranscriptFormattingSnapshot(1.5, 300, 700, "v1");
+        var transcript = new MeetingTranscript
+        {
+            Id = Guid.NewGuid(),
+            MeetingJobId = job.Id,
+            TranscriptText = "Opening discussion.",
+            TranscriptFilePath = $"Transcript/{job.Id:N}.txt",
+            SegmentsJson = JsonSerializer.Serialize(
+                new[] { new TranscriptionSegment(TimeSpan.FromSeconds(65), TimeSpan.FromSeconds(72), "Opening discussion.") },
+                JsonOptions),
+            ParagraphsJson = JsonSerializer.Serialize(paragraphs, JsonOptions),
+            FormattingVersion = "v1",
+            FormattingConfigurationJson = JsonSerializer.Serialize(formatting, JsonOptions)
+        };
+        await _factory.SeedAsync(job, transcript);
+
+        var response = await _factory.Client.GetAsync($"/api/meetings/{job.Id}/transcript");
+        var json = await ReadJsonAsync(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(json.RootElement.GetProperty("hasTimestamps").GetBoolean());
+        Assert.Equal("v1", json.RootElement.GetProperty("formattingVersion").GetString());
+        Assert.Equal(65, json.RootElement.GetProperty("paragraphs")[0].GetProperty("startSeconds").GetDouble());
     }
 
     [Fact]
@@ -290,10 +330,12 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
         var jobId = Guid.NewGuid();
 
         var result = await _factory.Client.GetAsync($"/api/meetings/{jobId}/result");
+        var transcriptViewer = await _factory.Client.GetAsync($"/api/meetings/{jobId}/transcript");
         var transcript = await _factory.Client.GetAsync($"/api/meetings/{jobId}/transcript/download");
         var minutes = await _factory.Client.GetAsync($"/api/meetings/{jobId}/minutes/download");
 
         Assert.Equal(HttpStatusCode.NotFound, result.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, transcriptViewer.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, transcript.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, minutes.StatusCode);
     }

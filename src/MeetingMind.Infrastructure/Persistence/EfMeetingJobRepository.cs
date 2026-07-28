@@ -1,12 +1,17 @@
 using MeetingMind.Application.Common.Interfaces;
 using MeetingMind.Domain.Entities;
 using MeetingMind.Domain.Enums;
+using MeetingMind.Application.Common.Exceptions;
+using MeetingMind.Application.Meetings;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
 namespace MeetingMind.Infrastructure.Persistence;
 
 public class EfMeetingJobRepository : IMeetingJobRepository
 {
+    private static readonly JsonSerializerOptions TranscriptJsonOptions =
+        new(JsonSerializerDefaults.Web);
     private readonly MeetingMindDbContext _dbContext;
 
     public EfMeetingJobRepository(MeetingMindDbContext dbContext)
@@ -34,6 +39,59 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         return _dbContext.MeetingTranscripts
             .AsNoTracking()
             .SingleOrDefaultAsync(transcript => transcript.MeetingJobId == meetingJobId, cancellationToken);
+    }
+
+    public async Task<StructuredTranscriptCheckpoint?> GetStructuredTranscriptCheckpointAsync(
+        Guid meetingJobId,
+        CancellationToken cancellationToken)
+    {
+        var transcript = await GetTranscriptByJobIdAsync(meetingJobId, cancellationToken);
+        if (transcript is null ||
+            transcript.SegmentsJson is null &&
+            transcript.ParagraphsJson is null &&
+            transcript.FormattingVersion is null &&
+            transcript.FormattingConfigurationJson is null)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(transcript.SegmentsJson) ||
+            string.IsNullOrWhiteSpace(transcript.ParagraphsJson) ||
+            string.IsNullOrWhiteSpace(transcript.FormattingVersion) ||
+            string.IsNullOrWhiteSpace(transcript.FormattingConfigurationJson))
+        {
+            throw InvalidStructuredCheckpoint();
+        }
+
+        try
+        {
+            var segments = JsonSerializer.Deserialize<TranscriptionSegment[]>(
+                transcript.SegmentsJson,
+                TranscriptJsonOptions);
+            var paragraphs = JsonSerializer.Deserialize<TranscriptParagraph[]>(
+                transcript.ParagraphsJson,
+                TranscriptJsonOptions);
+            var formatting = JsonSerializer.Deserialize<TranscriptFormattingSnapshot>(
+                transcript.FormattingConfigurationJson,
+                TranscriptJsonOptions);
+
+            if (segments is null ||
+                paragraphs is null ||
+                formatting is null ||
+                formatting.FormattingVersion != transcript.FormattingVersion ||
+                !IsValid(segments, paragraphs, formatting))
+            {
+                throw InvalidStructuredCheckpoint();
+            }
+
+            return new StructuredTranscriptCheckpoint(segments, paragraphs, formatting);
+        }
+        catch (JsonException exception)
+        {
+            throw new PermanentMeetingProcessingException(
+                "The stored structured transcript checkpoint is invalid.",
+                exception);
+        }
     }
 
     public Task<MeetingMinutes?> GetMinutesByJobIdAsync(
@@ -108,6 +166,27 @@ public class EfMeetingJobRepository : IMeetingJobRepository
         string transcriptFilePath,
         CancellationToken cancellationToken)
     {
+        await SaveTranscriptCoreAsync(
+            meetingJobId,
+            transcriptText,
+            transcriptFilePath,
+            segmentsJson: null,
+            paragraphsJson: null,
+            formattingVersion: null,
+            formattingConfigurationJson: null,
+            cancellationToken);
+    }
+
+    private async Task SaveTranscriptCoreAsync(
+        Guid meetingJobId,
+        string transcriptText,
+        string transcriptFilePath,
+        string? segmentsJson,
+        string? paragraphsJson,
+        string? formattingVersion,
+        string? formattingConfigurationJson,
+        CancellationToken cancellationToken)
+    {
         var now = DateTimeOffset.UtcNow;
         var transcript = await _dbContext.MeetingTranscripts.SingleOrDefaultAsync(
             existingTranscript => existingTranscript.MeetingJobId == meetingJobId,
@@ -127,11 +206,33 @@ public class EfMeetingJobRepository : IMeetingJobRepository
 
         transcript.TranscriptText = transcriptText;
         transcript.TranscriptFilePath = transcriptFilePath;
+        transcript.SegmentsJson = segmentsJson;
+        transcript.ParagraphsJson = paragraphsJson;
+        transcript.FormattingVersion = formattingVersion;
+        transcript.FormattingConfigurationJson = formattingConfigurationJson;
 
         var meetingJob = await GetMeetingJobAsync(meetingJobId, cancellationToken);
         meetingJob.UpdatedAt = now;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SaveStructuredTranscriptAsync(
+        Guid meetingJobId,
+        string transcriptText,
+        string transcriptFilePath,
+        StructuredTranscriptCheckpoint checkpoint,
+        CancellationToken cancellationToken)
+    {
+        await SaveTranscriptCoreAsync(
+            meetingJobId,
+            transcriptText,
+            transcriptFilePath,
+            JsonSerializer.Serialize(checkpoint.Segments, TranscriptJsonOptions),
+            JsonSerializer.Serialize(checkpoint.Paragraphs, TranscriptJsonOptions),
+            checkpoint.Formatting.FormattingVersion,
+            JsonSerializer.Serialize(checkpoint.Formatting, TranscriptJsonOptions),
+            cancellationToken);
     }
 
     public async Task SaveMinutesAsync(
@@ -312,4 +413,50 @@ public class EfMeetingJobRepository : IMeetingJobRepository
                 cancellationToken)
             ?? throw new InvalidOperationException($"Meeting job '{meetingJobId}' was not found.");
     }
+
+    private static bool IsValid(
+        IReadOnlyList<TranscriptionSegment> segments,
+        IReadOnlyList<TranscriptParagraph> paragraphs,
+        TranscriptFormattingSnapshot formatting)
+    {
+        if (formatting.SilenceGapSeconds <= 0 ||
+            formatting.PreferredParagraphCharacters <= 0 ||
+            formatting.HardParagraphCharacters <= 0 ||
+            formatting.PreferredParagraphCharacters > formatting.HardParagraphCharacters ||
+            string.IsNullOrWhiteSpace(formatting.FormattingVersion))
+        {
+            return false;
+        }
+
+        TimeSpan? previousStart = null;
+        foreach (var segment in segments)
+        {
+            if (segment.Start < TimeSpan.Zero ||
+                segment.End < segment.Start ||
+                previousStart is not null && segment.Start < previousStart ||
+                string.IsNullOrWhiteSpace(segment.Text))
+            {
+                return false;
+            }
+
+            previousStart = segment.Start;
+        }
+
+        foreach (var paragraph in paragraphs)
+        {
+            if (string.IsNullOrWhiteSpace(paragraph.Text) ||
+                paragraph.Start is not null && paragraph.Start < TimeSpan.Zero ||
+                paragraph.Start is not null &&
+                paragraph.End is not null &&
+                paragraph.End < paragraph.Start)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static PermanentMeetingProcessingException InvalidStructuredCheckpoint() =>
+        new("The stored structured transcript checkpoint is invalid.");
 }

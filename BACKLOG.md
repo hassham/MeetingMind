@@ -10,15 +10,15 @@ preserved in [`docs/phase3/PLAN.md`](docs/phase3/PLAN.md).
 
 Status legend: `TODO` | `IN PROGRESS` | `BLOCKED` | `PARTIAL` | `DONE`
 
-Last updated: 2026-07-26.
+Last updated: 2026-07-28.
 
 ## Current delivery cycle: Phase 3
 
 **Theme:** Flexible meeting inputs, useful dashboards, readable transcripts,
 and independently trackable actions.
 
-**Overall status:** `IN PROGRESS` — P3-03 is implemented; PostgreSQL-backed
-API and persistence verification is blocked until Docker is available.
+**Overall status:** `IN PROGRESS` — P3-04 is implemented and awaiting
+Docker-backed integration and representative-audio verification.
 
 ### Phase 3 outcome
 
@@ -105,10 +105,9 @@ Additional tracking rules:
 
 ## Current focus
 
-P3-03 implementation and Docker-independent verification are complete. Start
-Docker, start the Development API so it applies migrations automatically, and
-run the full solution test suite to close its remaining integration verification
-gate before beginning P3-04.
+P3-03 is complete. P3-04 implementation and non-Docker automated verification
+are complete. Docker-backed persistence/API tests and a representative local
+Whisper run remain before the package can be marked done.
 
 ### P3-01 — Reconcile Phase 3 requirements, UX, and contracts
 
@@ -267,12 +266,11 @@ Notes:
 
 ### P3-03 — Deliver all three creation workflows
 
-**Status:** `IN PROGRESS — VERIFICATION BLOCKED`
+**Status:** `DONE`
 
 **Depends on:** P3-02.
 **Started:** 2026-07-26.
-**Completion:** Implemented 2026-07-26; Docker-backed API and persistence tests
-remain to be executed.
+**Completed:** 2026-07-28.
 
 - [x] Add the explicit audio creation endpoint and processing-mode validation.
 - [x] Preserve `/api/meetings/upload` as a documented deprecated
@@ -316,8 +314,9 @@ Evidence:
 - Frontend verification passed: ESLint, production build, and 20 Vitest tests.
 - The PostgreSQL-backed API suite compiles and includes explicit-mode,
   compatibility, strict transcript-validation, persistence, and pre-enqueue
-  rejection coverage. Execution is pending because the local Docker engine was
-  unavailable (`npipe://./pipe/docker_engine` access denied).
+  rejection coverage.
+- Developer verification on 2026-07-28: `dotnet test MeetingMind.sln` passed
+  with Docker/PostgreSQL available.
 - The answered P3-03 decisions are archived in
   `docs/archive/phase3/QUESTIONS_p3_03_creation_workflows.md`.
 - Local startup was simplified on 2026-07-26: committed Development paths,
@@ -328,25 +327,27 @@ Evidence:
 
 ### P3-04 — Produce readable structured transcripts
 
-**Status:** `TODO`
+**Status:** `PARTIAL — AWAITING VERIFICATION`
 
 **Depends on:** P3-03.
-**Completion:** Not started.
+**Started:** 2026-07-28.
+**Completion:** Discovery and implementation completed 2026-07-28; final
+verification is pending.
 
-- [ ] Change `ITranscriptionService` to return an approved structured result
+- [x] Change `ITranscriptionService` to return an approved structured result
       without leaking Whisper provider types.
-- [ ] Preserve normalized segment start time, end time, and text.
-- [ ] Persist structured segments and formatting metadata using the approved
+- [x] Preserve normalized segment start time, end time, and text.
+- [x] Persist structured segments and formatting metadata using the approved
       storage model.
-- [ ] Implement deterministic whitespace normalization and paragraph rendering.
-- [ ] Break paragraphs using configurable silence, preferred-size punctuation,
+- [x] Implement deterministic whitespace normalization and paragraph rendering.
+- [x] Break paragraphs using configurable silence, preferred-size punctuation,
       and hard-size rules while avoiding short one-line fragments.
-- [ ] Default to a 1.5-second silence gap, 300-character preferred size, and
+- [x] Default to a 1.5-second silence gap, 300-character preferred size, and
       700-character hard bound unless P3-01 evidence records approved tuning.
-- [ ] Validate all formatting configuration at API/Worker startup where used.
-- [ ] Show paragraph-start timestamps in the viewer and provide a clean text
+- [x] Validate all formatting configuration at API/Worker startup where used.
+- [x] Show paragraph-start timestamps in the viewer and provide a clean text
       transcript download.
-- [ ] Reuse valid structured transcript checkpoints after retry without calling
+- [x] Reuse valid structured transcript checkpoints after retry without calling
       Whisper again.
 - [ ] Add tests for punctuation, silence, hard bounds, empty segments,
       cancellation, persistence, retry, and deterministic rerendering.
@@ -362,7 +363,18 @@ Acceptance criteria:
 - Valid checkpoints avoid retranscription during retry.
 - No UI or download labels paragraphs as speaker turns.
 
-Evidence: Pending.
+Evidence:
+
+- `dotnet build MeetingMind.sln --no-restore` passed on 2026-07-28 with no
+  warnings or errors.
+- Unit tests passed: 51/51. Worker tests passed: 40/40.
+- Frontend lint and production build passed; frontend tests passed: 21/21.
+- Migration `20260728114026_AddStructuredTranscripts` was generated and
+  persistence/API integration coverage was added.
+- Docker-backed integration execution is pending because the current Codex
+  process was denied access to `npipe://./pipe/docker_engine`; this was an
+  environment failure before any integration assertion ran.
+- Representative local Whisper audio verification remains pending.
 
 ### P3-05 — Build the dashboard and application navigation
 

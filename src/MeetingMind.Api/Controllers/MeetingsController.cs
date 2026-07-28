@@ -193,6 +193,21 @@ public class MeetingsController : ControllerBase
         });
     }
 
+    [HttpGet("{jobId:guid}/transcript")]
+    public async Task<IActionResult> GetTranscript(Guid jobId, CancellationToken cancellationToken)
+    {
+        var result = await _meetingTranscriptService.GetTranscriptAsync(jobId, cancellationToken);
+        if (result is null)
+        {
+            return NotFound(new
+            {
+                error = "Meeting transcript not found."
+            });
+        }
+
+        return Ok(result);
+    }
+
     [HttpGet("{jobId:guid}/transcript/download")]
     public async Task<IActionResult> DownloadTranscript(Guid jobId, CancellationToken cancellationToken)
     {

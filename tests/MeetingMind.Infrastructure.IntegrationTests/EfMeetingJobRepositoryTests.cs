@@ -1,3 +1,4 @@
+using MeetingMind.Application.Meetings;
 using MeetingMind.Domain.Entities;
 using MeetingMind.Domain.Enums;
 using MeetingMind.Infrastructure.Persistence;
@@ -150,6 +151,41 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
         Assert.Equal("Minutes/minutes.md", minutes.MinutesFilePath);
         Assert.Equal(1, dbContext.MeetingTranscripts.Count());
         Assert.Equal(1, dbContext.MeetingMinutes.Count());
+    }
+
+    [Fact]
+    public async Task StructuredTranscriptCheckpointRoundTripsAndLegacySaveClearsIt()
+    {
+        await _fixture.ResetAsync();
+        await using var dbContext = _fixture.CreateDbContext();
+        var repository = new EfMeetingJobRepository(dbContext);
+        var job = CreateJob("structured.wav");
+        await repository.AddAsync(job, CancellationToken.None);
+        var checkpoint = new StructuredTranscriptCheckpoint(
+            [new TranscriptionSegment(TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4), "Hello team.")],
+            [new TranscriptParagraph("Hello team.", TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4))],
+            new TranscriptFormattingSnapshot(1.5, 300, 700, "v1"));
+
+        await repository.SaveStructuredTranscriptAsync(
+            job.Id,
+            "Hello team.",
+            "Transcript/structured.txt",
+            checkpoint,
+            CancellationToken.None);
+        var saved = await repository.GetStructuredTranscriptCheckpointAsync(job.Id, CancellationToken.None);
+
+        Assert.NotNull(saved);
+        Assert.Equal(checkpoint.Formatting, saved.Formatting);
+        Assert.Equal(checkpoint.Segments, saved.Segments);
+        Assert.Equal(checkpoint.Paragraphs, saved.Paragraphs);
+
+        await repository.SaveTranscriptAsync(
+            job.Id,
+            "Imported transcript",
+            "Transcript/imported.txt",
+            CancellationToken.None);
+
+        Assert.Null(await repository.GetStructuredTranscriptCheckpointAsync(job.Id, CancellationToken.None));
     }
 
     [Fact]

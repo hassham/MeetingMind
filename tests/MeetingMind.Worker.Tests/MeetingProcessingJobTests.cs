@@ -25,6 +25,9 @@ public sealed class MeetingProcessingJobTests
         Assert.Equal(1, harness.Minutes.CallCount);
         Assert.Equal("Audio/Processed/meeting.wav", harness.Repository.Job.ProcessedFilePath);
         Assert.Equal("Test transcript", harness.Repository.Transcript?.TranscriptText);
+        Assert.NotNull(harness.Repository.StructuredCheckpoint);
+        Assert.Single(harness.Repository.StructuredCheckpoint.Segments);
+        Assert.Single(harness.Repository.StructuredCheckpoint.Paragraphs);
         Assert.NotNull(harness.Repository.SavedMinutes);
         Assert.Equal(MeetingJobStatus.Completed, harness.Repository.Job.Status);
         Assert.Equal(MeetingJobStage.Completed, harness.Repository.Job.Stage);
@@ -116,6 +119,7 @@ public sealed class MeetingProcessingJobTests
         Assert.Equal(1, harness.Audio.CallCount);
         Assert.Equal(1, harness.Transcription.CallCount);
         Assert.Equal(2, harness.Minutes.CallCount);
+        Assert.NotNull(harness.Repository.StructuredCheckpoint);
         Assert.Equal(MeetingJobStatus.Completed, harness.Repository.Job.Status);
         Assert.Equal(1, harness.Repository.Job.AutomaticRetryCount);
         Assert.Null(harness.Repository.Job.NextRetryAt);
@@ -191,7 +195,7 @@ public sealed class MeetingProcessingJobTests
     }
 
     [Fact]
-    public async Task MissingCheckpointArtifactFallsBackToEarlierStage()
+    public async Task MissingLegacyCheckpointArtifactIsRestoredWithoutRetranscription()
     {
         var harness = new ProcessingHarness();
         harness.Repository.Job.ProcessedFilePath = "Audio/Processed/missing.wav";
@@ -204,9 +208,12 @@ public sealed class MeetingProcessingJobTests
 
         await harness.Job.ProcessMeetingAsync(harness.Repository.Job.Id);
 
-        Assert.Equal(1, harness.Audio.CallCount);
-        Assert.Equal(1, harness.Transcription.CallCount);
-        Assert.Equal("Test transcript", harness.Repository.Transcript.TranscriptText);
+        Assert.Equal(0, harness.Audio.CallCount);
+        Assert.Equal(0, harness.Transcription.CallCount);
+        Assert.Equal("Old transcript", harness.Repository.Transcript.TranscriptText);
+        Assert.Contains(
+            $"Transcript/{harness.Repository.Job.Id:N}.txt",
+            harness.Storage.Files);
     }
 
     [Fact]
@@ -288,6 +295,8 @@ public sealed class MeetingProcessingJobTests
                 Repository,
                 Transcription,
                 Minutes,
+                new TranscriptFormatter(),
+                new TranscriptFormattingOptions(),
                 new MeetingFailureClassifier(),
                 RetryOptions,
                 TimeProvider);
@@ -340,10 +349,18 @@ public sealed class MeetingProcessingJobTests
     {
         public int CallCount { get; private set; }
 
-        public Task<string> TranscribeAsync(string audioPath, CancellationToken cancellationToken)
+        public Task<TranscriptionResult> TranscribeAsync(
+            string audioPath,
+            CancellationToken cancellationToken)
         {
             CallCount++;
-            return Task.FromResult("Test transcript");
+            return Task.FromResult(new TranscriptionResult(
+            [
+                new TranscriptionSegment(
+                    TimeSpan.Zero,
+                    TimeSpan.FromSeconds(1),
+                    "Test transcript")
+            ]));
         }
     }
 
@@ -441,6 +458,8 @@ public sealed class MeetingProcessingJobTests
 
         public MeetingTranscript? Transcript { get; set; }
 
+        public StructuredTranscriptCheckpoint? StructuredCheckpoint { get; set; }
+
         public MeetingMinutes? SavedMinutes { get; private set; }
 
         public List<StatusUpdate> StatusUpdates { get; } = [];
@@ -453,6 +472,11 @@ public sealed class MeetingProcessingJobTests
 
         public Task<MeetingTranscript?> GetTranscriptByJobIdAsync(Guid meetingJobId, CancellationToken cancellationToken) =>
             Task.FromResult(meetingJobId == Job.Id ? Transcript : null);
+
+        public Task<StructuredTranscriptCheckpoint?> GetStructuredTranscriptCheckpointAsync(
+            Guid meetingJobId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(meetingJobId == Job.Id ? StructuredCheckpoint : null);
 
         public Task<MeetingMinutes?> GetMinutesByJobIdAsync(Guid meetingJobId, CancellationToken cancellationToken) =>
             Task.FromResult<MeetingMinutes?>(SavedMinutes);
@@ -496,6 +520,21 @@ public sealed class MeetingProcessingJobTests
                 TranscriptFilePath = transcriptFilePath
             };
             return Task.CompletedTask;
+        }
+
+        public Task SaveStructuredTranscriptAsync(
+            Guid meetingJobId,
+            string transcriptText,
+            string transcriptFilePath,
+            StructuredTranscriptCheckpoint checkpoint,
+            CancellationToken cancellationToken)
+        {
+            StructuredCheckpoint = checkpoint;
+            return SaveTranscriptAsync(
+                meetingJobId,
+                transcriptText,
+                transcriptFilePath,
+                cancellationToken);
         }
 
         public Task SaveMinutesAsync(Guid meetingJobId, MeetingMinutes minutes, CancellationToken cancellationToken)

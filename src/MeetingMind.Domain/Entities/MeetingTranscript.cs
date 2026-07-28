@@ -10,6 +10,14 @@ public class MeetingTranscript
 
     public string? TranscriptFilePath { get; set; }
 
+    public string? SegmentsJson { get; set; }
+
+    public string? ParagraphsJson { get; set; }
+
+    public string? FormattingVersion { get; set; }
+
+    public string? FormattingConfigurationJson { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public MeetingJob? MeetingJob { get; set; }
