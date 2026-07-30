@@ -4,6 +4,7 @@ using Hangfire.PostgreSql;
 using MeetingMind.Application.Common.Interfaces;
 using MeetingMind.Application.Common.Options;
 using MeetingMind.Application.Meetings;
+using MeetingMind.Application.Dashboard;
 using MeetingMind.Infrastructure.BackgroundJobs;
 using MeetingMind.Infrastructure.Configuration;
 using MeetingMind.Infrastructure.Persistence;
@@ -72,6 +73,8 @@ builder.Services.AddScoped<IOperationalReadinessService, OperationalReadinessSer
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IBackgroundJobService, HangfireBackgroundJobService>();
 builder.Services.AddScoped<IMeetingJobRepository, EfMeetingJobRepository>();
+builder.Services.AddScoped<IDashboardRepository, EfDashboardRepository>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IUploadMeetingService, UploadMeetingService>();
 builder.Services.AddScoped<IMeetingStatusService, MeetingStatusService>();
 builder.Services.AddScoped<IMeetingTranscriptService, MeetingTranscriptService>();

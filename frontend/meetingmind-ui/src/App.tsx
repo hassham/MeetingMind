@@ -169,7 +169,7 @@ const retryableStatuses = new Set(['Failed', 'Cancelled'])
 const historyPageSize = 20
 type CreationMode = 'FullMeeting' | 'TranscriptOnly' | 'MinutesFromTranscript'
 
-function App() {
+function App({ pageMode = 'processing' }: { pageMode?: 'new' | 'processing' }) {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [historyTotal, setHistoryTotal] = useState(0)
   const [historyPage, setHistoryPage] = useState(0)
@@ -517,10 +517,12 @@ function App() {
             >
               <Box>
                 <Typography variant="h4" component="h1" fontWeight={700}>
-                  MeetingMind AI
+                  {pageMode === 'new' ? 'New processing job' : 'All processing'}
                 </Typography>
                 <Typography color="text.secondary">
-                  Convert meeting recordings into transcript, decisions, and action items.
+                  {pageMode === 'new'
+                    ? 'Choose the result you need and upload its source.'
+                    : 'Review every processing job, including active, failed, and transcript-only work.'}
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -552,7 +554,8 @@ function App() {
               </Alert>
             ) : null}
 
-            <Box className="workspace-grid">
+            <Box className={pageMode === 'new' ? 'workspace-grid new-job-layout' : 'workspace-grid'}>
+              {pageMode === 'processing' ? (
               <Box className="surface history-panel">
                 <Stack spacing={2}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -673,6 +676,7 @@ function App() {
                   </Stack>
                 </Stack>
               </Box>
+              ) : null}
 
               <Box className="detail-stack">
                 <UploadPanel
@@ -682,7 +686,7 @@ function App() {
                   onUpload={handleUpload}
                 />
                 <Box className="surface">
-                  {selectedJob ? (
+                {pageMode === 'processing' && selectedJob ? (
                     <Stack spacing={2.5}>
                       <Stack
                         direction={{ xs: 'column', md: 'row' }}
@@ -872,7 +876,7 @@ function App() {
                             onRefresh={() => void loadStatus(selectedJob.jobId)}
                             onRetry={() => void retryJob(selectedJob.jobId)}
                           />
-                        ) : (
+                ) : pageMode === 'processing' ? (
                           <TranscriptPanel
                             isLoading={isResultLoading}
                             transcript={transcript}
@@ -881,7 +885,7 @@ function App() {
                             onRefresh={() => void loadStatus(selectedJob.jobId)}
                             onRetry={() => void retryJob(selectedJob.jobId)}
                           />
-                        )}
+                ) : null}
                       </Box>
                     </Stack>
                   ) : (

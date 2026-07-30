@@ -4,6 +4,54 @@
   background: #f6f7f9;
 }
 
+.route-shell {
+  min-height: 100vh;
+  background: #f6f7f9;
+}
+
+.site-header {
+  border-bottom: 1px solid #dce2ea;
+}
+
+.route-page {
+  padding-top: 32px;
+  padding-bottom: 48px;
+}
+
+.placeholder-page,
+.empty-dashboard {
+  display: grid;
+  gap: 18px;
+  justify-items: start;
+}
+
+.new-job-layout {
+  grid-template-columns: minmax(0, 760px);
+  justify-content: center;
+}
+
+.recent-panel {
+  min-height: 220px;
+}
+
+.recent-row {
+  justify-content: space-between !important;
+  padding: 12px !important;
+  text-align: left;
+}
+
+.recent-row > span:first-child {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+}
+
+.recent-row small {
+  color: #5b6574;
+  font-weight: 400;
+  text-transform: none;
+}
+
 .top-bar {
   align-items: flex-start;
 }

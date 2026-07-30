@@ -238,6 +238,50 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
     }
 
     [Fact]
+    public async Task DashboardSummaryReturnsAllTimeContract()
+    {
+        await _factory.ResetAsync();
+        var completed = CreateJob(
+            MeetingJobStatus.Completed,
+            MeetingJobStage.Completed,
+            100,
+            DateTimeOffset.UtcNow);
+        completed.StartedAt = completed.CreatedAt.AddSeconds(10);
+        completed.CompletedAt = completed.CreatedAt.AddSeconds(50);
+        completed.SourceAudioDurationSeconds = 75;
+        var transcript = new MeetingTranscript
+        {
+            Id = Guid.NewGuid(),
+            MeetingJobId = completed.Id,
+            TranscriptText = "Transcript",
+            TranscriptFilePath = "Transcript/dashboard.txt"
+        };
+        var minutes = new MeetingMinutes
+        {
+            Id = Guid.NewGuid(),
+            MeetingJobId = completed.Id,
+            Title = "Dashboard meeting",
+            Summary = "Summary"
+        };
+        await _factory.SeedAsync(completed, transcript, minutes);
+
+        var response = await _factory.Client.GetAsync("/api/dashboard/summary");
+        var json = await ReadJsonAsync(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("All time", json.RootElement.GetProperty("timeBasis").GetString());
+        Assert.Equal(1, json.RootElement.GetProperty("totalJobs").GetInt32());
+        Assert.Equal(100, json.RootElement.GetProperty("successRatePercent").GetDouble());
+        Assert.Equal(75, json.RootElement.GetProperty("totalAudioDurationSeconds").GetInt64());
+        Assert.Equal(40, json.RootElement.GetProperty("averageCompletedProcessingDurationSeconds").GetDouble());
+        Assert.Equal(1, json.RootElement.GetProperty("transcriptCount").GetInt32());
+        Assert.Equal(1, json.RootElement.GetProperty("minutesCount").GetInt32());
+        Assert.Equal(completed.Id, json.RootElement.GetProperty("recentJobs")[0].GetProperty("jobId").GetGuid());
+        Assert.Equal("Dashboard meeting", json.RootElement.GetProperty("recentMinutes")[0].GetProperty("title").GetString());
+        Assert.False(json.RootElement.TryGetProperty("actions", out _));
+    }
+
+    [Fact]
     public async Task ResultAndDownloadsReturnPersistedArtifacts()
     {
         await _factory.ResetAsync();

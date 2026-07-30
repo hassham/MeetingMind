@@ -17,8 +17,8 @@ Last updated: 2026-07-28.
 **Theme:** Flexible meeting inputs, useful dashboards, readable transcripts,
 and independently trackable actions.
 
-**Overall status:** `IN PROGRESS` — P3-04 is implemented and awaiting
-Docker-backed integration and representative-audio verification.
+**Overall status:** `IN PROGRESS` — P3-05 is implemented and awaiting final
+manual responsive and color-contrast verification.
 
 ### Phase 3 outcome
 
@@ -105,9 +105,8 @@ Additional tracking rules:
 
 ## Current focus
 
-P3-03 is complete. P3-04 implementation and non-Docker automated verification
-are complete. Docker-backed persistence/API tests and a representative local
-Whisper run remain before the package can be marked done.
+P3-03 and P3-04 are complete. P3-05 implementation and automated verification
+are complete; final manual verification remains.
 
 ### P3-01 — Reconcile Phase 3 requirements, UX, and contracts
 
@@ -327,12 +326,11 @@ Evidence:
 
 ### P3-04 — Produce readable structured transcripts
 
-**Status:** `PARTIAL — AWAITING VERIFICATION`
+**Status:** `DONE`
 
 **Depends on:** P3-03.
 **Started:** 2026-07-28.
-**Completion:** Discovery and implementation completed 2026-07-28; final
-verification is pending.
+**Completion:** Completed and verified 2026-07-30.
 
 - [x] Change `ITranscriptionService` to return an approved structured result
       without leaking Whisper provider types.
@@ -349,9 +347,9 @@ verification is pending.
       transcript download.
 - [x] Reuse valid structured transcript checkpoints after retry without calling
       Whisper again.
-- [ ] Add tests for punctuation, silence, hard bounds, empty segments,
+- [x] Add tests for punctuation, silence, hard bounds, empty segments,
       cancellation, persistence, retry, and deterministic rerendering.
-- [ ] Verify representative audio manually without claiming speaker identity.
+- [x] Verify representative audio manually without claiming speaker identity.
 
 Acceptance criteria:
 
@@ -371,30 +369,30 @@ Evidence:
 - Frontend lint and production build passed; frontend tests passed: 21/21.
 - Migration `20260728114026_AddStructuredTranscripts` was generated and
   persistence/API integration coverage was added.
-- Docker-backed integration execution is pending because the current Codex
-  process was denied access to `npipe://./pipe/docker_engine`; this was an
-  environment failure before any integration assertion ran.
-- Representative local Whisper audio verification remains pending.
+- Docker-backed persistence/API tests passed on 2026-07-30.
+- Representative local Whisper audio verification completed on 2026-07-30.
 
 ### P3-05 — Build the dashboard and application navigation
 
-**Status:** `TODO`
+**Status:** `PARTIAL — AWAITING MANUAL VERIFICATION`
 
 **Depends on:** P3-04.
-**Completion:** Not started.
+**Started:** 2026-07-30.
+**Completion:** Implementation and automated verification completed 2026-07-30;
+final manual responsive and color-contrast verification is pending.
 
-- [ ] Add bounded aggregate repository queries rather than loading all history.
-- [ ] Add Dashboard Application service and `GET /api/dashboard/summary`.
+- [x] Add bounded aggregate repository queries rather than loading all history.
+- [x] Add Dashboard Application service and `GET /api/dashboard/summary`.
 - [ ] Return approved all-time job totals, counts by mode/status, success rate,
       duration/audio measures, transcript/minutes totals, action counts, and
       bounded recent items.
-- [ ] Add client-side routes for Dashboard, New Processing Job, Meeting Minutes,
+- [x] Add client-side routes for Dashboard, New Processing Job, Meeting Minutes,
       Meeting Detail, Actions, and All Processing.
-- [ ] Make Dashboard the initial route and preserve deep links after refresh.
-- [ ] Render loading, zero-data, partial-data, error, and mixed-status states.
-- [ ] Link dashboard cards/recent items to their relevant destinations without
+- [x] Make Dashboard the initial route and preserve deep links after refresh.
+- [x] Render loading, zero-data, partial-data, error, and mixed-status states.
+- [x] Link dashboard cards/recent items to their relevant destinations without
       coupling action state to meeting state.
-- [ ] Add query, Application, API contract, frontend, responsive, keyboard, and
+- [x] Add query, Application, API contract, frontend, responsive, keyboard, and
       automated accessibility tests.
 
 Acceptance criteria:
@@ -407,7 +405,33 @@ Acceptance criteria:
 - Primary dashboard states have no serious or critical automated accessibility
   violations; manual contrast and responsive checks are recorded.
 
-Evidence: Pending.
+Evidence:
+
+- Decision record:
+  [`docs/archive/phase3/QUESTIONS_p3_05_dashboard_navigation.md`](docs/archive/phase3/QUESTIONS_p3_05_dashboard_navigation.md).
+- `dotnet build MeetingMind.sln --no-restore` passed with zero warnings and
+  errors on 2026-07-30.
+- `dotnet test MeetingMind.sln --no-build --no-restore` passed, including the
+  PostgreSQL-backed aggregate-query and API-contract coverage.
+- Unit tests passed: 53/53. Worker regression tests passed: 40/40.
+- Frontend ESLint and production build passed; Vitest passed 30/30 tests,
+  including direct routes, dashboard states, retry behavior, and automated axe
+  checks for serious/critical accessibility violations.
+- Captured EF Core SQL confirms grouped database aggregates, artifact counts,
+  and bounded `LIMIT 5` projections for recent jobs and minutes. Dashboard
+  queries do not retrieve complete history, transcript bodies, or minutes
+  bodies.
+- `git diff --check` passed for the P3-05 implementation files.
+
+Notes:
+
+- Approved decision Q1 defers independent action metrics to P3-07 rather than
+  deriving misleading temporary counts from immutable generated-minutes JSON.
+  This is the remaining unchecked portion of the combined metric checklist.
+- Meeting Minutes, Meeting Detail, and Actions use accessible, refresh-safe
+  placeholders until P3-06 and P3-07 implement their full screens.
+- P3-05 remains `PARTIAL` until manual responsive and color-contrast checks are
+  recorded. Completion is not claimed.
 
 ### P3-06 — Deliver the meeting-minutes library and detail screen
 

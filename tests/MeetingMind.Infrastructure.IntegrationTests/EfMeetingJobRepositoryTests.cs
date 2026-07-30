@@ -208,6 +208,70 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
     }
 
     [Fact]
+    public async Task DashboardSummaryUsesAggregatesAndBoundsRecentItems()
+    {
+        await _fixture.ResetAsync();
+        await using var dbContext = _fixture.CreateDbContext();
+        var now = DateTimeOffset.UtcNow;
+        var jobs = Enumerable.Range(0, 7)
+            .Select(index => CreateJob($"meeting-{index}.mp3", now.AddMinutes(-index)))
+            .ToArray();
+        jobs[0].Status = MeetingJobStatus.Completed;
+        jobs[0].Stage = MeetingJobStage.Completed;
+        jobs[0].StartedAt = now.AddSeconds(-120);
+        jobs[0].CompletedAt = now.AddSeconds(-60);
+        jobs[0].SourceAudioDurationSeconds = 90;
+        jobs[1].Status = MeetingJobStatus.Failed;
+        jobs[2].Status = MeetingJobStatus.Cancelled;
+        jobs[3].Status = MeetingJobStatus.Processing;
+        jobs[4].ProcessingMode = MeetingProcessingMode.TranscriptOnly;
+        jobs[4].SourceAudioDurationSeconds = 30;
+        jobs[5].ProcessingMode = MeetingProcessingMode.MinutesFromTranscript;
+        jobs[5].OriginalFilePath = "Transcript/imported.txt";
+        jobs[6].Status = MeetingJobStatus.Completed;
+        jobs[6].Stage = MeetingJobStage.Completed;
+        jobs[6].StartedAt = now.AddSeconds(-20);
+        jobs[6].CompletedAt = now.AddSeconds(-30);
+        dbContext.MeetingJobs.AddRange(jobs);
+        dbContext.MeetingTranscripts.Add(new MeetingTranscript
+        {
+            Id = Guid.NewGuid(),
+            MeetingJobId = jobs[0].Id,
+            TranscriptText = "Transcript",
+            TranscriptFilePath = "Transcript/one.txt"
+        });
+        dbContext.MeetingMinutes.Add(new MeetingMinutes
+        {
+            Id = Guid.NewGuid(),
+            MeetingJobId = jobs[0].Id,
+            Title = "Newest minutes",
+            Summary = "Summary",
+            CreatedAt = now
+        });
+        await dbContext.SaveChangesAsync();
+
+        var result = await new EfDashboardRepository(dbContext)
+            .GetSummaryAsync(20, CancellationToken.None);
+
+        Assert.Equal(7, result.TotalJobs);
+        Assert.Equal(2, result.CompletedJobs);
+        Assert.Equal(1, result.FailedJobs);
+        Assert.Equal(1, result.CancelledJobs);
+        Assert.Equal(1, result.ProcessingJobs);
+        Assert.Equal(5, result.FullMeetingJobs);
+        Assert.Equal(1, result.TranscriptOnlyJobs);
+        Assert.Equal(1, result.MinutesFromTranscriptJobs);
+        Assert.Equal(120, result.TotalAudioDurationSeconds);
+        Assert.Equal(60, result.AverageCompletedProcessingDurationSeconds);
+        Assert.Equal(1, result.TranscriptCount);
+        Assert.Equal(1, result.MinutesCount);
+        Assert.Equal(5, result.RecentJobs.Count);
+        Assert.Single(result.RecentMinutes);
+        Assert.Equal(jobs[0].Id, result.RecentJobs[0].JobId);
+        Assert.Equal("Newest minutes", result.RecentMinutes[0].Title);
+    }
+
+    [Fact]
     public async Task ResetForRetryPreservesPreviousTimingUntilNewAttemptStarts()
     {
         await _fixture.ResetAsync();
