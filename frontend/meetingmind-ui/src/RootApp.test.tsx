@@ -7,6 +7,9 @@ import { describe, expect, it } from 'vitest'
 import RootApp from './RootApp'
 import { server } from './test/server'
 
+const jobId = '11111111-1111-1111-1111-111111111111'
+const now = '2026-07-30T01:00:00Z'
+
 const summary = {
   timeBasis: 'All time',
   totalJobs: 4,
@@ -129,7 +132,7 @@ describe('application routes and dashboard', () => {
     ['/process/new', 'New processing job'],
     ['/processing', 'All processing'],
     ['/meetings', 'Meeting minutes'],
-    ['/meetings/11111111-1111-1111-1111-111111111111', 'Meeting detail'],
+    ['/meetings/11111111-1111-1111-1111-111111111111', 'Meeting could not be loaded'],
     ['/actions', 'Actions'],
     ['/unknown', 'Page not found'],
   ])('restores direct route %s', async (path, heading) => {
@@ -137,5 +140,30 @@ describe('application routes and dashboard', () => {
     await waitFor(() =>
       expect(screen.getByRole('heading', { level: 1, name: heading })).toBeInTheDocument(),
     )
+  })
+
+  it('renders the minutes library and opens a deep-linked immutable detail', async () => {
+    server.use(
+      http.get('*/api/meetings/minutes', () => HttpResponse.json({ skip:0,take:20,total:1,items:[{jobId, title:'Planning', originalFileName:'planning.mp3', sourceType:'Audio', processingMode:'FullMeeting', createdAt:now, startedAt:now, completedAt:now, minutesCreatedAt:now}] })),
+      http.get(`*/api/meetings/${jobId}/result`, () => HttpResponse.json({jobId,originalFileName:'planning.mp3',sourceType:'Audio',processingMode:'FullMeeting',createdAt:now,startedAt:now,completedAt:now,hasTranscript:true,title:'Planning',summary:'Summary',attendees:['Hasham'],discussionPoints:['Scope'],decisions:['Approve'],actionItems:[{description:'Write tests',owner:'Hasham',dueDate:'Friday'}],risks:['Schedule'],nextSteps:['Implement']})),
+      http.get(`*/api/meetings/${jobId}/transcript`, () => HttpResponse.json({hasTimestamps:true,paragraphs:[{text:'Opening discussion.',startSeconds:65}]})),
+    )
+    const user = userEvent.setup()
+    renderRoute('/meetings')
+    const open = await screen.findByRole('link',{name:'Open meeting'})
+    await user.click(open)
+    expect(await screen.findByRole('heading',{level:1,name:'Planning'})).toBeInTheDocument()
+    expect(screen.getByRole('heading',{name:'Generated action-items snapshot'})).toBeInTheDocument()
+    expect(screen.getByText('[01:05]')).toBeInTheDocument()
+    expect(screen.getByText(/Independent action tracking/)).toBeInTheDocument()
+  })
+
+  it('shows safe empty and not-found minutes states', async () => {
+    const { unmount } = renderRoute('/meetings')
+    expect(await screen.findByRole('heading',{name:'No meeting minutes yet'})).toBeInTheDocument()
+    unmount()
+    server.use(http.get(`*/api/meetings/${jobId}/result`, () => HttpResponse.json({}, {status:404})))
+    renderRoute(`/meetings/${jobId}`)
+    expect(await screen.findByRole('heading',{name:'Meeting minutes unavailable'})).toBeInTheDocument()
   })
 })

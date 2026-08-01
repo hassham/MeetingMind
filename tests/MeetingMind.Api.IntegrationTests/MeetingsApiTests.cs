@@ -282,6 +282,29 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
     }
 
     [Fact]
+    public async Task MinutesLibraryReturnsOnlyPersistedMinutesAndSafeMetadata()
+    {
+        await _factory.ResetAsync();
+        var withMinutes = CreateJob(MeetingJobStatus.Completed, MeetingJobStage.Completed, 100, DateTimeOffset.UtcNow);
+        withMinutes.StartedAt = withMinutes.CreatedAt.AddSeconds(5);
+        withMinutes.CompletedAt = withMinutes.CreatedAt.AddSeconds(30);
+        var withoutMinutes = CreateJob(MeetingJobStatus.Completed, MeetingJobStage.Completed, 100, DateTimeOffset.UtcNow.AddMinutes(1));
+        var minutes = new MeetingMinutes { Id = Guid.NewGuid(), MeetingJobId = withMinutes.Id, Title = "Library meeting", Summary = "Summary" };
+        await _factory.SeedAsync(withMinutes, withoutMinutes, minutes);
+
+        var response = await _factory.Client.GetAsync("/api/meetings/minutes?skip=0&take=20");
+        var json = await ReadJsonAsync(response);
+        var item = json.RootElement.GetProperty("items")[0];
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, json.RootElement.GetProperty("total").GetInt32());
+        Assert.Equal(withMinutes.Id, item.GetProperty("jobId").GetGuid());
+        Assert.Equal("Library meeting", item.GetProperty("title").GetString());
+        Assert.Equal("Audio", item.GetProperty("sourceType").GetString());
+        Assert.False(item.TryGetProperty("originalFilePath", out _));
+    }
+
+    [Fact]
     public async Task ResultAndDownloadsReturnPersistedArtifacts()
     {
         await _factory.ResetAsync();
@@ -321,6 +344,9 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
         var minutesResponse = await _factory.Client.GetAsync($"/api/meetings/{job.Id}/minutes/download");
 
         Assert.Equal(HttpStatusCode.OK, resultResponse.StatusCode);
+        Assert.Equal(job.OriginalFileName, result.RootElement.GetProperty("originalFileName").GetString());
+        Assert.Equal("Audio", result.RootElement.GetProperty("sourceType").GetString());
+        Assert.True(result.RootElement.GetProperty("hasTranscript").GetBoolean());
         Assert.Equal("Planning", result.RootElement.GetProperty("title").GetString());
         Assert.Equal("Approve scope", result.RootElement.GetProperty("decisions")[0].GetString());
         Assert.Equal(HttpStatusCode.OK, transcriptViewerResponse.StatusCode);

@@ -10,4 +10,5 @@ export const emptyHistory = {
 
 export const server = setupServer(
   http.get('*/api/meetings/history', () => HttpResponse.json(emptyHistory)),
+  http.get('*/api/meetings/minutes', () => HttpResponse.json({ skip: 0, take: 20, total: 0, items: [] })),
 )

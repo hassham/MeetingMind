@@ -17,8 +17,7 @@ Last updated: 2026-07-28.
 **Theme:** Flexible meeting inputs, useful dashboards, readable transcripts,
 and independently trackable actions.
 
-**Overall status:** `IN PROGRESS` — P3-05 is implemented and awaiting final
-manual responsive and color-contrast verification.
+**Overall status:** `IN PROGRESS` — P3-06 is complete and P3-07 is next.
 
 ### Phase 3 outcome
 
@@ -105,8 +104,7 @@ Additional tracking rules:
 
 ## Current focus
 
-P3-03 and P3-04 are complete. P3-05 implementation and automated verification
-are complete; final manual verification remains.
+P3-03 through P3-06 are complete. P3-07 is next.
 
 ### P3-01 — Reconcile Phase 3 requirements, UX, and contracts
 
@@ -374,18 +372,18 @@ Evidence:
 
 ### P3-05 — Build the dashboard and application navigation
 
-**Status:** `PARTIAL — AWAITING MANUAL VERIFICATION`
+**Status:** `DONE`
 
 **Depends on:** P3-04.
 **Started:** 2026-07-30.
-**Completion:** Implementation and automated verification completed 2026-07-30;
-final manual responsive and color-contrast verification is pending.
+**Completion:** Completed and verified 2026-08-01.
 
 - [x] Add bounded aggregate repository queries rather than loading all history.
 - [x] Add Dashboard Application service and `GET /api/dashboard/summary`.
-- [ ] Return approved all-time job totals, counts by mode/status, success rate,
-      duration/audio measures, transcript/minutes totals, action counts, and
-      bounded recent items.
+- [x] Return approved all-time job totals, counts by mode/status, success rate,
+      duration/audio measures, transcript/minutes totals, and bounded recent
+      items. Independent action counts remain assigned to P3-07 by approved
+      decision.
 - [x] Add client-side routes for Dashboard, New Processing Job, Meeting Minutes,
       Meeting Detail, Actions, and All Processing.
 - [x] Make Dashboard the initial route and preserve deep links after refresh.
@@ -422,37 +420,47 @@ Evidence:
   queries do not retrieve complete history, transcript bodies, or minutes
   bodies.
 - `git diff --check` passed for the P3-05 implementation files.
+- Manual browser verification passed on 2026-08-01 at 1440x900, 768x900, and
+  390x844: dashboard cards reflowed without horizontal overflow, desktop
+  navigation collapsed to the labelled menu, the brand touch target measured
+  44 pixels high, and keyboard focus used a 3-pixel high-contrast outline.
+- Primary white-on-blue controls measured a 6.72:1 contrast ratio; primary
+  heading text measured 19.59:1 against the dashboard background. The manual
+  pass added and reverified the explicit focus outline and brand target size.
 
 Notes:
 
 - Approved decision Q1 defers independent action metrics to P3-07 rather than
   deriving misleading temporary counts from immutable generated-minutes JSON.
   This is the remaining unchecked portion of the combined metric checklist.
-- Meeting Minutes, Meeting Detail, and Actions use accessible, refresh-safe
-  placeholders until P3-06 and P3-07 implement their full screens.
-- P3-05 remains `PARTIAL` until manual responsive and color-contrast checks are
-  recorded. Completion is not claimed.
+- P3-05 established accessible, refresh-safe route placeholders. P3-06 replaced
+  the Meeting Minutes and Meeting Detail placeholders; Actions remains reserved
+  for P3-07.
+- P3-05 is complete. P3-06 is unblocked.
 
 ### P3-06 — Deliver the meeting-minutes library and detail screen
 
-**Status:** `TODO`
+**Status:** `DONE`
 
 **Depends on:** P3-05.
-**Completion:** Not started.
+**Started:** 2026-08-01.
+**Completion:** Completed and verified 2026-08-01.
 
-- [ ] Add a newest-first, server-paginated completed-minutes query.
-- [ ] Expose generated title, source filename/type, and processing timestamps
+- [x] Add a newest-first, server-paginated completed-minutes query.
+- [x] Expose generated title, source filename/type, and processing timestamps
       without local paths.
-- [ ] Build the Meeting Minutes library with loading, empty, error, pagination,
+- [x] Build the Meeting Minutes library with loading, empty, error, pagination,
       and not-found behavior.
-- [ ] Build a deep-linked Meeting Detail view containing all eight structured
+- [x] Build a deep-linked Meeting Detail view containing all eight structured
       minutes sections, meeting details, transcript access, and downloads.
-- [ ] Show read-only links to actions with that meeting as provenance.
-- [ ] Keep active, failed, cancelled, and transcript-only work in All
+- [x] Reserve the read-only linked-actions context with an explicit P3-07
+      placeholder, as approved for the package boundary.
+- [x] Keep active, failed, cancelled, and transcript-only work in All
       Processing rather than the minutes library.
-- [ ] Ensure action edits never mutate meeting status, progress, timestamps, or
-      generated-minutes JSON.
-- [ ] Add query, API, frontend, deep-link refresh, pagination, keyboard, and
+- [x] Ensure the P3-06 read model cannot mutate meeting status, progress,
+      timestamps, or generated-minutes JSON. Action command verification
+      remains assigned to P3-07.
+- [x] Add query, API, frontend, deep-link refresh, pagination, keyboard, and
       accessibility tests.
 
 Acceptance criteria:
@@ -461,10 +469,38 @@ Acceptance criteria:
 - Direct meeting links survive browser refresh and return a safe not-found state
   for unknown or unavailable records.
 - Meeting details and all eight sections match persisted immutable data.
-- Action provenance is navigable but never presented as meeting progress.
+- The action-provenance context is reserved without presenting action state as
+  meeting progress; real navigation remains assigned to P3-07 by approved Q2.
 - Existing transcript and minutes downloads remain correct.
 
-Evidence: Pending.
+Evidence:
+
+- Decision record:
+  [`docs/archive/phase3/QUESTIONS_p3_06_minutes_library_detail.md`](docs/archive/phase3/QUESTIONS_p3_06_minutes_library_detail.md).
+- Migration `20260801052821_AddMinutesLibraryIndex` adds the descending
+  `MeetingMinutes(CreatedAt, Id)` index used by newest-first paging.
+- `dotnet build MeetingMind.sln -c Release --no-restore` passed with zero
+  warnings and errors.
+- `dotnet test MeetingMind.sln -c Release --no-build --no-restore` passed:
+  56 unit tests, 40 Worker tests, and all PostgreSQL-backed Infrastructure/API
+  integration tests, including minutes-only paging and safe metadata contracts.
+- Frontend ESLint and production build passed; Vitest passed 32/32 tests,
+  including library/detail routes, immutable sections, transcript timestamps,
+  empty and not-found states.
+- Live browser verification against the local PostgreSQL data returned exactly
+  12 persisted-minutes records, opened a stable deep link, rendered all
+  immutable sections plus the timestamped transcript, and exposed safe
+  minutes/transcript downloads without local paths.
+- Manual 390x844 detail verification found no horizontal overflow. Primary
+  buttons and icon buttons were raised to the 44-pixel touch-target baseline.
+- `git diff --check` passed.
+
+Notes:
+
+- Approved Q2 keeps independent linked-action data in P3-07. P3-06 displays a
+  truthful context placeholder and never derives action lifecycle state from
+  generated-minutes JSON.
+- P3-07 is unblocked.
 
 ### P3-07 — Deliver independent action management and export
 

@@ -20,6 +20,8 @@ import { useState } from 'react'
 import { Link, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import App from './App'
 import DashboardPage from './dashboard/DashboardPage'
+import MinutesLibraryPage from './meetings/MinutesLibraryPage'
+import MeetingDetailPage from './meetings/MeetingDetailPage'
 
 const theme = createTheme({
   palette: {
@@ -72,6 +74,7 @@ export default function RootApp() {
             <Toolbar disableGutters>
               <Typography
                 component={Link}
+                className="site-brand"
                 to="/"
                 variant="h6"
                 color="text.primary"
@@ -126,24 +129,8 @@ export default function RootApp() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/process/new" element={<App pageMode="new" />} />
           <Route path="/processing" element={<App pageMode="processing" />} />
-          <Route
-            path="/meetings"
-            element={
-              <PlaceholderPage
-                title="Meeting minutes"
-                description="The searchable meeting-minutes library arrives in P3-06."
-              />
-            }
-          />
-          <Route
-            path="/meetings/:jobId"
-            element={
-              <PlaceholderPage
-                title="Meeting detail"
-                description="Deep-linked meeting details arrive in P3-06. This URL is already reserved and refresh-safe."
-              />
-            }
-          />
+          <Route path="/meetings" element={<MinutesLibraryPage />} />
+          <Route path="/meetings/:jobId" element={<MeetingDetailPage />} />
           <Route
             path="/actions"
             element={

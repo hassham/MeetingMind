@@ -272,6 +272,34 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
     }
 
     [Fact]
+    public async Task MinutesQueryReturnsOnlyPersistedMinutesNewestFirstAndBounded()
+    {
+        await _fixture.ResetAsync();
+        await using var dbContext = _fixture.CreateDbContext();
+        var now = DateTimeOffset.UtcNow;
+        var withoutMinutes = CreateJob("transcript-only.wav", now.AddMinutes(1));
+        withoutMinutes.ProcessingMode = MeetingProcessingMode.TranscriptOnly;
+        var older = CreateJob("older.wav", now.AddMinutes(-2));
+        var newer = CreateJob("notes.md", now);
+        newer.OriginalFilePath = "Transcript/notes.md";
+        newer.ProcessingMode = MeetingProcessingMode.MinutesFromTranscript;
+        dbContext.MeetingJobs.AddRange(withoutMinutes, older, newer);
+        var olderMinutes = CreateMinutes(older.Id, "Older"); olderMinutes.CreatedAt = now.AddMinutes(-1);
+        var newerMinutes = CreateMinutes(newer.Id, "Newer"); newerMinutes.CreatedAt = now;
+        dbContext.MeetingMinutes.AddRange(olderMinutes, newerMinutes);
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EfMeetingMinutesQueryRepository(dbContext);
+        var page = await repository.GetPageAsync(0, 1, CancellationToken.None);
+
+        Assert.Equal(2, await repository.CountAsync(CancellationToken.None));
+        var item = Assert.Single(page);
+        Assert.Equal(newer.Id, item.JobId);
+        Assert.Equal("Transcript", item.SourceType);
+        Assert.Equal("MinutesFromTranscript", item.ProcessingMode);
+    }
+
+    [Fact]
     public async Task ResetForRetryPreservesPreviousTimingUntilNewAttemptStarts()
     {
         await _fixture.ResetAsync();

@@ -102,6 +102,9 @@ namespace MeetingMind.Infrastructure.Persistence
                 entity.Property(minutes => minutes.MinutesFilePath).HasMaxLength(1024);
                 entity.Property(minutes => minutes.CreatedAt).IsRequired();
                 entity.HasIndex(minutes => minutes.MeetingJobId).IsUnique();
+                entity.HasIndex(minutes => new { minutes.CreatedAt, minutes.Id })
+                    .IsDescending()
+                    .HasDatabaseName("IX_MeetingMinutes_CreatedAt_Id");
             });
         }
     }

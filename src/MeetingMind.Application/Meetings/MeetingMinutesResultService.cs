@@ -1,5 +1,6 @@
 using System.Text.Json;
 using MeetingMind.Application.Common.Interfaces;
+using MeetingMind.Domain.Enums;
 
 namespace MeetingMind.Application.Meetings;
 
@@ -22,8 +23,9 @@ public class MeetingMinutesResultService : IMeetingMinutesResultService
         Guid meetingJobId,
         CancellationToken cancellationToken)
     {
+        var job = await _meetingJobRepository.GetByIdAsync(meetingJobId, cancellationToken);
         var minutes = await _meetingJobRepository.GetMinutesByJobIdAsync(meetingJobId, cancellationToken);
-        if (minutes is null)
+        if (job is null || minutes is null)
         {
             return null;
         }
@@ -34,6 +36,14 @@ public class MeetingMinutesResultService : IMeetingMinutesResultService
 
         return new MeetingMinutesResult(
             meetingJobId,
+            job.OriginalFileName,
+            job.ProcessingMode == MeetingProcessingMode.MinutesFromTranscript ? "Transcript" : "Audio",
+            job.ProcessingMode.ToString(),
+            job.CreatedAt,
+            job.StartedAt,
+            job.CompletedAt,
+            job.Transcript is not null ||
+            await _meetingJobRepository.GetTranscriptByJobIdAsync(meetingJobId, cancellationToken) is not null,
             minutes.Title,
             minutes.Summary,
             fullMinutes.Attendees,

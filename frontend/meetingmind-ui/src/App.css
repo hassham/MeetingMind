@@ -13,6 +13,22 @@
   border-bottom: 1px solid #dce2ea;
 }
 
+.site-brand {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+:focus-visible {
+  outline: 3px solid #285f8f;
+  outline-offset: 3px;
+}
+
+.MuiButton-root,
+.MuiIconButton-root {
+  min-height: 44px;
+}
+
 .route-page {
   padding-top: 32px;
   padding-bottom: 48px;
@@ -50,6 +66,34 @@
   color: #5b6574;
   font-weight: 400;
   text-transform: none;
+}
+
+.minutes-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.pagination-bar {
+  padding: 8px 0;
+}
+
+.minutes-detail {
+  display: grid;
+  gap: 28px;
+}
+
+@media (max-width: 600px) {
+  .minutes-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pagination-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 }
 
 .top-bar {

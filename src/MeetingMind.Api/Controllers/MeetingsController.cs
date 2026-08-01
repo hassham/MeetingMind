@@ -16,6 +16,7 @@ public class MeetingsController : ControllerBase
     private readonly IMeetingMinutesResultService _meetingMinutesResultService;
     private readonly IMeetingRetryService _meetingRetryService;
     private readonly IMeetingHistoryService _meetingHistoryService;
+    private readonly IMeetingMinutesQueryService _meetingMinutesQueryService;
 
     public MeetingsController(
         IUploadMeetingService uploadMeetingService,
@@ -23,7 +24,8 @@ public class MeetingsController : ControllerBase
         IMeetingTranscriptService meetingTranscriptService,
         IMeetingMinutesResultService meetingMinutesResultService,
         IMeetingRetryService meetingRetryService,
-        IMeetingHistoryService meetingHistoryService)
+        IMeetingHistoryService meetingHistoryService,
+        IMeetingMinutesQueryService meetingMinutesQueryService)
     {
         _uploadMeetingService = uploadMeetingService;
         _meetingStatusService = meetingStatusService;
@@ -31,6 +33,7 @@ public class MeetingsController : ControllerBase
         _meetingMinutesResultService = meetingMinutesResultService;
         _meetingRetryService = meetingRetryService;
         _meetingHistoryService = meetingHistoryService;
+        _meetingMinutesQueryService = meetingMinutesQueryService;
     }
 
     [HttpPost("upload")]
@@ -193,6 +196,15 @@ public class MeetingsController : ControllerBase
         });
     }
 
+    [HttpGet("minutes")]
+    public async Task<ActionResult<MeetingMinutesListResult>> GetMinutesLibrary(
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 20,
+        CancellationToken cancellationToken = default)
+    {
+        return Ok(await _meetingMinutesQueryService.GetMinutesAsync(skip, take, cancellationToken));
+    }
+
     [HttpGet("{jobId:guid}/transcript")]
     public async Task<IActionResult> GetTranscript(Guid jobId, CancellationToken cancellationToken)
     {
@@ -269,6 +281,13 @@ public class MeetingsController : ControllerBase
         return Ok(new
         {
             jobId = result.JobId,
+            originalFileName = result.OriginalFileName,
+            sourceType = result.SourceType,
+            processingMode = result.ProcessingMode,
+            createdAt = result.CreatedAt,
+            startedAt = result.StartedAt,
+            completedAt = result.CompletedAt,
+            hasTranscript = result.HasTranscript,
             title = result.Title,
             summary = result.Summary,
             attendees = result.Attendees,

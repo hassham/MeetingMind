@@ -73,6 +73,7 @@ builder.Services.AddScoped<IOperationalReadinessService, OperationalReadinessSer
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IBackgroundJobService, HangfireBackgroundJobService>();
 builder.Services.AddScoped<IMeetingJobRepository, EfMeetingJobRepository>();
+builder.Services.AddScoped<IMeetingMinutesQueryRepository, EfMeetingMinutesQueryRepository>();
 builder.Services.AddScoped<IDashboardRepository, EfDashboardRepository>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IUploadMeetingService, UploadMeetingService>();
@@ -81,6 +82,7 @@ builder.Services.AddScoped<IMeetingTranscriptService, MeetingTranscriptService>(
 builder.Services.AddScoped<IMeetingMinutesResultService, MeetingMinutesResultService>();
 builder.Services.AddScoped<IMeetingRetryService, MeetingRetryService>();
 builder.Services.AddScoped<IMeetingHistoryService, MeetingHistoryService>();
+builder.Services.AddScoped<IMeetingMinutesQueryService, MeetingMinutesQueryService>();
 
 var app = builder.Build();
 
