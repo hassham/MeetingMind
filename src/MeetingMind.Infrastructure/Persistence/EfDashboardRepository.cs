@@ -8,10 +8,12 @@ namespace MeetingMind.Infrastructure.Persistence;
 public sealed class EfDashboardRepository : IDashboardRepository
 {
     private readonly MeetingMindDbContext _dbContext;
+    private readonly TimeProvider _timeProvider;
 
-    public EfDashboardRepository(MeetingMindDbContext dbContext)
+    public EfDashboardRepository(MeetingMindDbContext dbContext, TimeProvider? timeProvider = null)
     {
         _dbContext = dbContext;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<DashboardQuerySnapshot> GetSummaryAsync(
@@ -56,6 +58,9 @@ public sealed class EfDashboardRepository : IDashboardRepository
 
         var transcriptCount = await _dbContext.MeetingTranscripts.CountAsync(cancellationToken);
         var minutesCount = await _dbContext.MeetingMinutes.CountAsync(cancellationToken);
+        var actionCounts = await _dbContext.ActionItems.AsNoTracking().GroupBy(action => action.Status).Select(group => new { Status = group.Key, Count = group.Count() }).ToDictionaryAsync(item => item.Status, item => item.Count, cancellationToken);
+        var utcToday = DateOnly.FromDateTime(_timeProvider.GetUtcNow().UtcDateTime);
+        var overdueActions = await _dbContext.ActionItems.CountAsync(action => action.DueDate < utcToday && action.Status != ActionItemStatus.Completed && action.Status != ActionItemStatus.Cancelled, cancellationToken);
 
         var recentJobs = await jobs
             .OrderByDescending(job => job.CreatedAt)
@@ -99,6 +104,12 @@ public sealed class EfDashboardRepository : IDashboardRepository
             averageCompletedDuration,
             transcriptCount,
             minutesCount,
+            GetCount(actionCounts, ActionItemStatus.Open),
+            GetCount(actionCounts, ActionItemStatus.InProgress),
+            GetCount(actionCounts, ActionItemStatus.Blocked),
+            GetCount(actionCounts, ActionItemStatus.Completed),
+            GetCount(actionCounts, ActionItemStatus.Cancelled),
+            overdueActions,
             recentJobs,
             recentMinutes);
     }

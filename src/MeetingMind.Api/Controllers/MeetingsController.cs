@@ -3,6 +3,7 @@ using MeetingMind.Application.Common.Failures;
 using MeetingMind.Application.Meetings;
 using Microsoft.AspNetCore.Mvc;
 using MeetingMind.Domain.Enums;
+using MeetingMind.Application.Actions;
 
 namespace MeetingMind.Api.Controllers;
 
@@ -17,6 +18,7 @@ public class MeetingsController : ControllerBase
     private readonly IMeetingRetryService _meetingRetryService;
     private readonly IMeetingHistoryService _meetingHistoryService;
     private readonly IMeetingMinutesQueryService _meetingMinutesQueryService;
+    private readonly IActionService _actionService;
 
     public MeetingsController(
         IUploadMeetingService uploadMeetingService,
@@ -25,7 +27,8 @@ public class MeetingsController : ControllerBase
         IMeetingMinutesResultService meetingMinutesResultService,
         IMeetingRetryService meetingRetryService,
         IMeetingHistoryService meetingHistoryService,
-        IMeetingMinutesQueryService meetingMinutesQueryService)
+        IMeetingMinutesQueryService meetingMinutesQueryService,
+        IActionService actionService)
     {
         _uploadMeetingService = uploadMeetingService;
         _meetingStatusService = meetingStatusService;
@@ -34,6 +37,7 @@ public class MeetingsController : ControllerBase
         _meetingRetryService = meetingRetryService;
         _meetingHistoryService = meetingHistoryService;
         _meetingMinutesQueryService = meetingMinutesQueryService;
+        _actionService = actionService;
     }
 
     [HttpPost("upload")]
@@ -312,6 +316,13 @@ public class MeetingsController : ControllerBase
         }
 
         return File(result.Content, result.ContentType, result.FileName);
+    }
+
+    [HttpGet("{jobId:guid}/actions")]
+    public async Task<IActionResult> GetActions(Guid jobId, CancellationToken cancellationToken)
+    {
+        var result = await _actionService.ListAsync(new ActionQuery(0, 100, MeetingId: jobId), cancellationToken);
+        return Ok(result);
     }
 
     private IActionResult AcceptedResult(UploadMeetingResult result, bool includeMode)

@@ -24,5 +24,7 @@ public class MeetingMinutes
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    public DateTimeOffset? ActionsSeededAt { get; set; }
+
     public MeetingJob? MeetingJob { get; set; }
 }

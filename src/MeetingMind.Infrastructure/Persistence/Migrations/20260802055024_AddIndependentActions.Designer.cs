@@ -3,6 +3,7 @@ using System;
 using MeetingMind.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MeetingMind.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(MeetingMindDbContext))]
-    partial class MeetingMindDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260802055024_AddIndependentActions")]
+    partial class AddIndependentActions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -100,15 +103,7 @@ namespace MeetingMind.Infrastructure.Persistence.Migrations
 
                     b.ToTable("ActionItems", t =>
                         {
-                            t.HasCheckConstraint("CK_ActionItems_CompletedAt", "(\"Status\" = 'Completed' AND \"CompletedAt\" IS NOT NULL) OR (\"Status\" <> 'Completed' AND \"CompletedAt\" IS NULL)");
-
                             t.HasCheckConstraint("CK_ActionItems_Description", "length(btrim(\"Description\")) BETWEEN 1 AND 2000");
-
-                            t.HasCheckConstraint("CK_ActionItems_GeneratedSourceKey", "(\"Source\" = 'Generated' AND \"GeneratedSourceKey\" IS NOT NULL) OR (\"Source\" = 'Manual' AND \"GeneratedSourceKey\" IS NULL)");
-
-                            t.HasCheckConstraint("CK_ActionItems_Source", "\"Source\" IN ('Generated', 'Manual')");
-
-                            t.HasCheckConstraint("CK_ActionItems_Status", "\"Status\" IN ('Open', 'InProgress', 'Blocked', 'Completed', 'Cancelled')");
 
                             t.HasCheckConstraint("CK_ActionItems_Version", "\"Version\" > 0");
                         });
@@ -223,9 +218,6 @@ namespace MeetingMind.Infrastructure.Persistence.Migrations
                     b.Property<string>("ActionItemsJson")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<DateTimeOffset?>("ActionsSeededAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");

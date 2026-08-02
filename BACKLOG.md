@@ -17,7 +17,7 @@ Last updated: 2026-07-28.
 **Theme:** Flexible meeting inputs, useful dashboards, readable transcripts,
 and independently trackable actions.
 
-**Overall status:** `IN PROGRESS` — P3-06 is complete and P3-07 is next.
+**Overall status:** `IN PROGRESS` — P3-07 is complete and P3-08 is next.
 
 ### Phase 3 outcome
 
@@ -104,7 +104,7 @@ Additional tracking rules:
 
 ## Current focus
 
-P3-03 through P3-06 are complete. P3-07 is next.
+P3-03 through P3-07 are complete. P3-08 is next.
 
 ### P3-01 — Reconcile Phase 3 requirements, UX, and contracts
 
@@ -504,33 +504,34 @@ Notes:
 
 ### P3-07 — Deliver independent action management and export
 
-**Status:** `TODO`
+**Status:** `DONE`
 
 **Depends on:** P3-06.
-**Completion:** Not started.
+**Started:** 2026-08-02.
+**Completed:** 2026-08-02.
 
-- [ ] Add the independent `Action` aggregate using the exact P3-01-approved
+- [x] Add the independent `Action` aggregate using the exact P3-01-approved
       fields, validation, status, source, and concurrency rules.
-- [ ] Add an optional meeting provenance relationship that does not own action
+- [x] Add an optional meeting provenance relationship that does not own action
       lifecycle.
-- [ ] Add EF migration, constraints, status/due-date/source/meeting indexes, and
+- [x] Add EF migration, constraints, status/due-date/source/meeting indexes, and
       restrictive or link-nulling retention behavior.
-- [ ] Idempotently seed generated actions after minutes persistence and retries.
-- [ ] Backfill existing generated minutes once without duplicate actions.
-- [ ] Add standalone Application services for action create, get, paginated
+- [x] Idempotently seed generated actions after minutes persistence and retries.
+- [x] Backfill existing generated minutes once without duplicate actions.
+- [x] Add standalone Application services for action create, get, paginated
       list/filter, update, link, unlink, and export.
-- [ ] Add thin `/api/actions` endpoints and the read-only
+- [x] Add thin `/api/actions` endpoints and the read-only
       `/api/meetings/{jobId}/actions` context query.
-- [ ] Support server-side filtering by status, assignee, due/overdue state,
+- [x] Support server-side filtering by status, assignee, due/overdue state,
       source, and linked meeting with deterministic ordering.
-- [ ] Return a conflict for stale optimistic-concurrency updates.
-- [ ] Define `IActionItemExporter` in Application and implement safe CSV and
+- [x] Return a conflict for stale optimistic-concurrency updates.
+- [x] Define `IActionItemExporter` in Application and implement safe CSV and
       JSON exports without provider credentials or local paths.
-- [ ] Build the standalone Actions screen with creation, editing, status,
+- [x] Build the standalone Actions screen with creation, editing, status,
       filters, optional meeting linking, meeting-context navigation, and export.
-- [ ] Add independent action counts to the dashboard without deriving a meeting
+- [x] Add independent action counts to the dashboard without deriving a meeting
       workflow status.
-- [ ] Add unit, persistence, migration/backfill, API contract, frontend,
+- [x] Add unit, persistence, migration/backfill, API contract, frontend,
       accessibility, concurrency, retention, and export tests.
 
 Acceptance criteria:
@@ -546,7 +547,30 @@ Acceptance criteria:
   fields, and optional meeting provenance.
 - No export contains physical paths, secrets, or unsupported Jira claims.
 
-Evidence: Pending.
+Evidence:
+
+- Decision record:
+  [`docs/archive/phase3/QUESTIONS_p3_07_independent_action_management.md`](docs/archive/phase3/QUESTIONS_p3_07_independent_action_management.md).
+- Release solution build passed with zero warnings and errors on 2026-08-02.
+- Unit tests passed 60/60; Worker regression tests passed 40/40.
+- PostgreSQL-backed Infrastructure integration tests passed 22/22, including
+  migration application, ISO-only generated due dates, deterministic source
+  keys, idempotent seeding, and the completed backfill checkpoint.
+- PostgreSQL-backed API integration tests passed 25/25, including manual action
+  creation, filtering, completion, stale-version conflict, CSV export, deletion,
+  and dashboard action counts.
+- Frontend ESLint and production build passed; Vitest passed 32/32 tests,
+  including primary-route and automated accessibility coverage.
+- The idempotent EF migration script generated successfully and
+  `git diff --check` passed.
+
+Notes:
+
+- Selected export is bounded to 100 IDs and filtered export to 5,000 rows.
+- Generated due dates accept exact ISO `yyyy-MM-dd` values only.
+- Legacy backfill runs in configurable batches through Hangfire and persists a
+  completion checkpoint even when a meeting contains no generated actions.
+- P3-08 is unblocked.
 
 ### P3-08 — Phase 3 release verification and documentation
 

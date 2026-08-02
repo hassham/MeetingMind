@@ -99,7 +99,7 @@ public sealed class MeetingMindApiFactory : WebApplicationFactory<Program>, IAsy
         var dbContext = scope.ServiceProvider.GetRequiredService<MeetingMindDbContext>();
         await dbContext.Database.ExecuteSqlRawAsync(
             """
-            TRUNCATE TABLE "MeetingMinutes", "MeetingTranscripts", "MeetingJobs" RESTART IDENTITY CASCADE;
+            TRUNCATE TABLE "ActionItems", "MeetingMinutes", "MeetingTranscripts", "MeetingJobs" RESTART IDENTITY CASCADE;
             """);
     }
 

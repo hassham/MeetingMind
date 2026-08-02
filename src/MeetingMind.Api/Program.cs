@@ -9,9 +9,13 @@ using MeetingMind.Infrastructure.BackgroundJobs;
 using MeetingMind.Infrastructure.Configuration;
 using MeetingMind.Infrastructure.Persistence;
 using MeetingMind.Infrastructure.Operations;
+using MeetingMind.Infrastructure.Exports;
+using MeetingMind.Application.Actions;
+using MeetingMind.Api;
 using MeetingMind.Infrastructure.Storage;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 var localSettingsPath = MeetingMindConfiguration.GetRepositoryLocalSettingsPath(
@@ -20,7 +24,7 @@ builder.Configuration.AddJsonFile(localSettingsPath, optional: true, reloadOnCha
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -83,6 +87,9 @@ builder.Services.AddScoped<IMeetingMinutesResultService, MeetingMinutesResultSer
 builder.Services.AddScoped<IMeetingRetryService, MeetingRetryService>();
 builder.Services.AddScoped<IMeetingHistoryService, MeetingHistoryService>();
 builder.Services.AddScoped<IMeetingMinutesQueryService, MeetingMinutesQueryService>();
+builder.Services.AddScoped<IActionRepository, EfActionRepository>();
+builder.Services.AddScoped<IActionItemExporter, ActionItemExporter>();
+builder.Services.AddScoped<IActionService, ActionService>();
 
 var app = builder.Build();
 
@@ -102,6 +109,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseMiddleware<ActionExceptionHandlerMiddleware>();
 
 app.UseHangfireDashboard("/hangfire", new DashboardOptions
 {

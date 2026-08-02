@@ -22,6 +22,7 @@ import App from './App'
 import DashboardPage from './dashboard/DashboardPage'
 import MinutesLibraryPage from './meetings/MinutesLibraryPage'
 import MeetingDetailPage from './meetings/MeetingDetailPage'
+import ActionsPage from './actions/ActionsPage'
 
 const theme = createTheme({
   palette: {
@@ -131,41 +132,11 @@ export default function RootApp() {
           <Route path="/processing" element={<App pageMode="processing" />} />
           <Route path="/meetings" element={<MinutesLibraryPage />} />
           <Route path="/meetings/:jobId" element={<MeetingDetailPage />} />
-          <Route
-            path="/actions"
-            element={
-              <PlaceholderPage
-                title="Actions"
-                description="Independent action tracking arrives in P3-07."
-              />
-            }
-          />
+          <Route path="/actions" element={<ActionsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Box>
     </ThemeProvider>
-  )
-}
-
-function PlaceholderPage({
-  title,
-  description,
-}: {
-  title: string
-  description: string
-}) {
-  return (
-    <Container component="main" maxWidth="lg" className="route-page">
-      <Box className="surface placeholder-page">
-        <Typography component="h1" variant="h4" fontWeight={800}>
-          {title}
-        </Typography>
-        <Typography color="text.secondary">{description}</Typography>
-        <Button component={Link} to="/" variant="outlined">
-          Return to dashboard
-        </Button>
-      </Box>
-    </Container>
   )
 }
 

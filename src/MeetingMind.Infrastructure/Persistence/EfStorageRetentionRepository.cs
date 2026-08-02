@@ -62,6 +62,22 @@ public sealed class EfStorageRetentionRepository : IStorageRetentionRepository
 
         await deleteArtifacts(candidate, cancellationToken);
 
+        var linkedActions = await _dbContext.ActionItems
+            .Where(action => action.MeetingJobId == jobId)
+            .ToListAsync(cancellationToken);
+        var meetingTitle = await _dbContext.MeetingMinutes
+            .Where(minutes => minutes.MeetingJobId == jobId)
+            .Select(minutes => minutes.Title)
+            .SingleOrDefaultAsync(cancellationToken) ?? job.OriginalFileName;
+        foreach (var action in linkedActions)
+        {
+            action.ProvenanceMeetingTitle ??= meetingTitle;
+            action.ProvenanceSourceFileName ??= job.OriginalFileName;
+            action.MeetingJobId = null;
+            action.UpdatedAt = DateTimeOffset.UtcNow;
+            action.Version++;
+        }
+
         _dbContext.MeetingJobs.Remove(job);
         await _dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

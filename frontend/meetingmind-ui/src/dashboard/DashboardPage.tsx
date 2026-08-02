@@ -58,6 +58,7 @@ type DashboardSummary = {
   averageCompletedProcessingDurationSeconds: number | null
   transcriptCount: number
   minutesCount: number
+  actions: { open: number; inProgress: number; blocked: number; completed: number; cancelled: number; overdue: number }
   recentJobs: RecentJob[]
   recentMinutes: RecentMinutes[]
 }
@@ -127,7 +128,8 @@ export default function DashboardPage() {
 }
 
 function DashboardContent({ summary }: { summary: DashboardSummary }) {
-  if (summary.totalJobs === 0) {
+  const totalActions = summary.actions.open + summary.actions.inProgress + summary.actions.blocked + summary.actions.completed + summary.actions.cancelled
+  if (summary.totalJobs === 0 && totalActions === 0) {
     return (
       <Box className="surface empty-dashboard">
         <Typography component="h2" variant="h5" fontWeight={750}>
@@ -162,6 +164,8 @@ function DashboardContent({ summary }: { summary: DashboardSummary }) {
     ],
     ['Transcripts', String(summary.transcriptCount), '/processing'],
     ['Minutes', String(summary.minutesCount), '/meetings'],
+    ['Open actions', String(summary.actions.open), '/actions'],
+    ['Overdue actions', String(summary.actions.overdue), '/actions'],
   ] as const
 
   return (

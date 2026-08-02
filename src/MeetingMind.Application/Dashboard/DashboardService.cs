@@ -39,6 +39,7 @@ public sealed class DashboardService : IDashboardService
             snapshot.AverageCompletedProcessingDurationSeconds,
             snapshot.TranscriptCount,
             snapshot.MinutesCount,
+            new DashboardActionCounts(snapshot.OpenActions, snapshot.InProgressActions, snapshot.BlockedActions, snapshot.CompletedActions, snapshot.CancelledActions, snapshot.OverdueActions),
             snapshot.RecentJobs,
             snapshot.RecentMinutes);
     }

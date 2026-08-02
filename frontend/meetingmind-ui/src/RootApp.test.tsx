@@ -31,6 +31,7 @@ const summary = {
   averageCompletedProcessingDurationSeconds: 90,
   transcriptCount: 3,
   minutesCount: 2,
+  actions: { open: 3, inProgress: 1, blocked: 1, completed: 4, cancelled: 0, overdue: 2 },
   recentJobs: [
     {
       jobId: '11111111-1111-1111-1111-111111111111',
@@ -96,6 +97,7 @@ describe('application routes and dashboard', () => {
           averageCompletedProcessingDurationSeconds: null,
           transcriptCount: 0,
           minutesCount: 0,
+          actions: { open: 0, inProgress: 0, blocked: 0, completed: 0, cancelled: 0, overdue: 0 },
           recentJobs: [],
           recentMinutes: [],
         }),

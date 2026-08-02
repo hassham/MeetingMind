@@ -17,6 +17,8 @@ namespace MeetingMind.Infrastructure.Persistence
 
         public DbSet<MeetingMinutes> MeetingMinutes => Set<MeetingMinutes>();
 
+        public DbSet<ActionItem> ActionItems => Set<ActionItem>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -74,6 +76,11 @@ namespace MeetingMind.Infrastructure.Persistence
                     .WithOne(minutes => minutes.MeetingJob)
                     .HasForeignKey<MeetingMinutes>(minutes => minutes.MeetingJobId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(job => job.Actions)
+                    .WithOne(action => action.MeetingJob)
+                    .HasForeignKey(action => action.MeetingJobId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<MeetingTranscript>(entity =>
@@ -101,10 +108,42 @@ namespace MeetingMind.Infrastructure.Persistence
                 entity.Property(minutes => minutes.FullMinutesJson).IsRequired();
                 entity.Property(minutes => minutes.MinutesFilePath).HasMaxLength(1024);
                 entity.Property(minutes => minutes.CreatedAt).IsRequired();
+                entity.Property(minutes => minutes.ActionsSeededAt);
                 entity.HasIndex(minutes => minutes.MeetingJobId).IsUnique();
                 entity.HasIndex(minutes => new { minutes.CreatedAt, minutes.Id })
                     .IsDescending()
                     .HasDatabaseName("IX_MeetingMinutes_CreatedAt_Id");
+            });
+
+            modelBuilder.Entity<ActionItem>(entity =>
+            {
+                entity.ToTable(table =>
+                {
+                    table.HasCheckConstraint("CK_ActionItems_Description", "length(btrim(\"Description\")) BETWEEN 1 AND 2000");
+                    table.HasCheckConstraint("CK_ActionItems_Version", "\"Version\" > 0");
+                    table.HasCheckConstraint("CK_ActionItems_Status", "\"Status\" IN ('Open', 'InProgress', 'Blocked', 'Completed', 'Cancelled')");
+                    table.HasCheckConstraint("CK_ActionItems_Source", "\"Source\" IN ('Generated', 'Manual')");
+                    table.HasCheckConstraint("CK_ActionItems_GeneratedSourceKey", "(\"Source\" = 'Generated' AND \"GeneratedSourceKey\" IS NOT NULL) OR (\"Source\" = 'Manual' AND \"GeneratedSourceKey\" IS NULL)");
+                    table.HasCheckConstraint("CK_ActionItems_CompletedAt", "(\"Status\" = 'Completed' AND \"CompletedAt\" IS NOT NULL) OR (\"Status\" <> 'Completed' AND \"CompletedAt\" IS NULL)");
+                });
+                entity.HasKey(action => action.Id);
+                entity.Property(action => action.Description).HasMaxLength(2000).IsRequired();
+                entity.Property(action => action.Assignee).HasMaxLength(200);
+                entity.Property(action => action.Notes).HasMaxLength(10000);
+                entity.Property(action => action.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+                entity.Property(action => action.Source).HasConversion<string>().HasMaxLength(32).IsRequired();
+                entity.Property(action => action.ProvenanceMeetingTitle).HasMaxLength(255);
+                entity.Property(action => action.ProvenanceSourceFileName).HasMaxLength(255);
+                entity.Property(action => action.GeneratedSourceKey).HasMaxLength(160);
+                entity.Property(action => action.CreatedAt).IsRequired();
+                entity.Property(action => action.UpdatedAt).IsRequired();
+                entity.Property(action => action.Version).IsConcurrencyToken().IsRequired();
+                entity.HasIndex(action => action.GeneratedSourceKey).IsUnique();
+                entity.HasIndex(action => new { action.CreatedAt, action.Id }).IsDescending();
+                entity.HasIndex(action => new { action.Status, action.CreatedAt });
+                entity.HasIndex(action => new { action.DueDate, action.Status });
+                entity.HasIndex(action => new { action.Source, action.CreatedAt });
+                entity.HasIndex(action => new { action.MeetingJobId, action.CreatedAt });
             });
         }
     }

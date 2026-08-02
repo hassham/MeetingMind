@@ -3,6 +3,7 @@ using MeetingMind.Application.Common.Failures;
 using MeetingMind.Application.Common.Interfaces;
 using MeetingMind.Application.Common.Options;
 using MeetingMind.Application.Meetings;
+using MeetingMind.Application.Actions;
 using MeetingMind.Domain.Entities;
 using MeetingMind.Domain.Enums;
 using System.Text.Json;
@@ -24,6 +25,7 @@ public class MeetingProcessingJob : IMeetingProcessingJob
     private readonly IMeetingFailureClassifier _failureClassifier;
     private readonly AutomaticRetryOptions _retryOptions;
     private readonly TimeProvider _timeProvider;
+    private readonly IActionService? _actionService;
 
     public MeetingProcessingJob(
         ILogger<MeetingProcessingJob> logger,
@@ -36,7 +38,8 @@ public class MeetingProcessingJob : IMeetingProcessingJob
         TranscriptFormattingOptions transcriptFormattingOptions,
         IMeetingFailureClassifier failureClassifier,
         AutomaticRetryOptions retryOptions,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IActionService? actionService = null)
     {
         _logger = logger;
         _audioProcessingService = audioProcessingService;
@@ -49,6 +52,7 @@ public class MeetingProcessingJob : IMeetingProcessingJob
         _failureClassifier = failureClassifier;
         _retryOptions = retryOptions;
         _timeProvider = timeProvider;
+        _actionService = actionService;
     }
 
     public async Task ProcessMeetingAsync(Guid jobId)
@@ -255,6 +259,11 @@ public class MeetingProcessingJob : IMeetingProcessingJob
                 jobId,
                 CreateMeetingMinutes(jobId, generatedMinutes, minutesFilePath),
                 CancellationToken.None);
+
+            if (_actionService is not null)
+            {
+                await _actionService.SeedGeneratedAsync(jobId, CancellationToken.None);
+            }
 
             LogStageOutcome(
                 LogLevel.Information,

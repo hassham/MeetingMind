@@ -22,6 +22,7 @@ public sealed class DashboardServiceTests
             45,
             7,
             4,
+            3, 2, 1, 4, 0, 1,
             [],
             []));
 
@@ -41,7 +42,7 @@ public sealed class DashboardServiceTests
     public async Task SummaryReturnsNullSuccessRateWithoutCompletedOrFailedJobs()
     {
         var repository = new StubDashboardRepository(new DashboardQuerySnapshot(
-            2, 1, 1, 0, 0, 0, 0, 1, 1, null, null, 0, 0, [], []));
+            2, 1, 1, 0, 0, 0, 0, 1, 1, null, null, 0, 0, 0, 0, 0, 0, 0, 0, [], []));
 
         var result = await new DashboardService(repository).GetSummaryAsync(CancellationToken.None);
 

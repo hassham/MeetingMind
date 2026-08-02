@@ -278,7 +278,9 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
         Assert.Equal(1, json.RootElement.GetProperty("minutesCount").GetInt32());
         Assert.Equal(completed.Id, json.RootElement.GetProperty("recentJobs")[0].GetProperty("jobId").GetGuid());
         Assert.Equal("Dashboard meeting", json.RootElement.GetProperty("recentMinutes")[0].GetProperty("title").GetString());
-        Assert.False(json.RootElement.TryGetProperty("actions", out _));
+        var actions = json.RootElement.GetProperty("actions");
+        Assert.Equal(0, actions.GetProperty("open").GetInt32());
+        Assert.Equal(0, actions.GetProperty("overdue").GetInt32());
     }
 
     [Fact]
@@ -469,6 +471,42 @@ public sealed class MeetingsApiTests : IClassFixture<MeetingMindApiFactory>
             [new MeetingActionItem("Write tests", "Hasham", "Friday")],
             ["Schedule"],
             ["Implement"]);
+    }
+
+    [Fact]
+    public async Task ActionsSupportCreateFilterConcurrencyExportAndDelete()
+    {
+        await _factory.ResetAsync();
+        var create = await _factory.Client.PostAsJsonAsync("/api/actions", new
+        {
+            description = "  Publish minutes  ", assignee = "Alex", notes = "Check commas, quotes, and Unicode ✓",
+            dueDate = "2026-08-01", meetingId = (Guid?)null
+        });
+        var created = await ReadJsonAsync(create);
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var id = created.RootElement.GetProperty("id").GetGuid();
+        var version = created.RootElement.GetProperty("version").GetString();
+        Assert.Equal("Publish minutes", created.RootElement.GetProperty("description").GetString());
+
+        var update = await _factory.Client.PatchAsJsonAsync($"/api/actions/{id}", new
+        {
+            description = "Publish minutes", assignee = "Alex", notes = (string?)null,
+            dueDate = "2026-08-01", status = "Completed", meetingId = (Guid?)null, version
+        });
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        var stale = await _factory.Client.PatchAsJsonAsync($"/api/actions/{id}", new
+        {
+            description = "Stale edit", assignee = (string?)null, notes = (string?)null,
+            dueDate = (string?)null, status = "Open", meetingId = (Guid?)null, version
+        });
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+
+        var list = await ReadJsonAsync(await _factory.Client.GetAsync("/api/actions?status=Completed&take=25"));
+        Assert.Equal(1, list.RootElement.GetProperty("total").GetInt32());
+        var export = await _factory.Client.GetAsync("/api/actions/export?format=csv");
+        Assert.Equal(HttpStatusCode.OK, export.StatusCode);
+        Assert.Contains("Publish minutes", await export.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.NoContent, (await _factory.Client.DeleteAsync($"/api/actions/{id}")).StatusCode);
     }
 
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response)

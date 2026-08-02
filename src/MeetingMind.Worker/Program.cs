@@ -14,6 +14,8 @@ using MeetingMind.Infrastructure.Transcription;
 using MeetingMind.Worker.Jobs;
 using Microsoft.EntityFrameworkCore;
 using MeetingMind.Worker;
+using MeetingMind.Application.Actions;
+using MeetingMind.Infrastructure.Exports;
 
 var builder = Host.CreateApplicationBuilder(args);
 var localSettingsPath = MeetingMindConfiguration.GetRepositoryLocalSettingsPath(
@@ -66,6 +68,10 @@ var transcriptFormattingOptions = MeetingMindConfiguration.ValidateTranscriptFor
         ?? new TranscriptFormattingOptions());
 builder.Services.AddSingleton(transcriptFormattingOptions);
 
+var actionBackfillOptions = builder.Configuration.GetSection("ActionBackfill").Get<ActionBackfillOptions>() ?? new ActionBackfillOptions();
+if (actionBackfillOptions.BatchSize is < 1 or > 500) throw new InvalidOperationException("Configuration setting 'ActionBackfill:BatchSize' must be between 1 and 500.");
+builder.Services.AddSingleton(actionBackfillOptions);
+
 GlobalJobFilters.Filters.Remove<AutomaticRetryAttribute>();
 GlobalJobFilters.Filters.Add(MeetingAutomaticRetryConfiguration.CreateFilter(automaticRetryOptions));
 
@@ -85,6 +91,9 @@ builder.Services.AddHangfire(configuration =>
 builder.Services.AddHangfireServer();
 builder.Services.AddScoped<IMeetingJobRepository, EfMeetingJobRepository>();
 builder.Services.AddScoped<IStorageRetentionRepository, EfStorageRetentionRepository>();
+builder.Services.AddScoped<IActionRepository, EfActionRepository>();
+builder.Services.AddScoped<IActionItemExporter, ActionItemExporter>();
+builder.Services.AddScoped<IActionService, ActionService>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddScoped<IAudioProcessingService, FfmpegAudioProcessingService>();
 builder.Services.AddScoped<ITranscriptionService, WhisperNetTranscriptionService>();
@@ -98,6 +107,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IMeetingProcessingJob, MeetingProcessingJob>();
 builder.Services.AddScoped<IStorageRetentionService, StorageRetentionService>();
 builder.Services.AddScoped<IStorageRetentionJob, StorageRetentionJob>();
+builder.Services.AddScoped<IActionBackfillJob, ActionBackfillJob>();
 
 var host = builder.Build();
 
@@ -124,6 +134,11 @@ using (var scope = host.Services.CreateScope())
     {
         recurringJobs.RemoveIfExists(retentionJobId);
     }
+}
+
+if (actionBackfillOptions.Enabled)
+{
+    BackgroundJob.Enqueue<IActionBackfillJob>(job => job.RunAsync());
 }
 
 host.Run();

@@ -71,6 +71,38 @@ public sealed class EfMeetingJobRepositoryTests : IClassFixture<PostgreSqlFixtur
     }
 
     [Fact]
+    public async Task GeneratedActionSeedingAndLegacyBackfillAreIdempotent()
+    {
+        await _fixture.ResetAsync();
+        await using var dbContext = _fixture.CreateDbContext();
+        var job = CreateJob("actions.mp3");
+        job.Status = MeetingJobStatus.Completed;
+        job.Stage = MeetingJobStage.Completed;
+        job.Minutes = new MeetingMinutes
+        {
+            Id = Guid.NewGuid(), MeetingJobId = job.Id, Title = "Action meeting", Summary = "Summary",
+            DecisionsJson = "[]", ActionItemsJson = "[{\"description\":\"Ship release\",\"owner\":\"Alex\",\"dueDate\":\"2026-08-15\"},{\"description\":\"Follow up\",\"owner\":null,\"dueDate\":\"Friday\"}]",
+            RisksJson = "[]", NextStepsJson = "[]", FullMinutesJson = "{}", CreatedAt = DateTimeOffset.UtcNow
+        };
+        dbContext.MeetingJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+        var repository = new EfActionRepository(dbContext, TimeProvider.System);
+
+        Assert.Equal(2, await repository.SeedGeneratedAsync(job.Id, CancellationToken.None));
+        Assert.Equal(0, await repository.SeedGeneratedAsync(job.Id, CancellationToken.None));
+        var actions = await dbContext.ActionItems.AsNoTracking().OrderBy(action => action.Description).ToArrayAsync();
+        Assert.Equal(2, actions.Length);
+        Assert.Null(actions.Single(action => action.Description == "Follow up").DueDate);
+        Assert.Equal(new DateOnly(2026, 8, 15), actions.Single(action => action.Description == "Ship release").DueDate);
+        Assert.Equal(2, actions.Select(action => action.GeneratedSourceKey).Distinct().Count());
+        Assert.NotNull(await dbContext.MeetingMinutes.Where(minutes => minutes.MeetingJobId == job.Id).Select(minutes => minutes.ActionsSeededAt).SingleAsync());
+
+        var backfill = await repository.BackfillAsync(100, CancellationToken.None);
+        Assert.Equal(0, backfill.ProcessedMeetings);
+        Assert.False(backfill.HasMore);
+    }
+
+    [Fact]
     public async Task DatabaseRejectsInvalidModeSpecificAudioMetadata()
     {
         await _fixture.ResetAsync();

@@ -14,6 +14,12 @@ public sealed record DashboardQuerySnapshot(
     double? AverageCompletedProcessingDurationSeconds,
     int TranscriptCount,
     int MinutesCount,
+    int OpenActions,
+    int InProgressActions,
+    int BlockedActions,
+    int CompletedActions,
+    int CancelledActions,
+    int OverdueActions,
     IReadOnlyList<DashboardRecentJob> RecentJobs,
     IReadOnlyList<DashboardRecentMinutes> RecentMinutes);
 

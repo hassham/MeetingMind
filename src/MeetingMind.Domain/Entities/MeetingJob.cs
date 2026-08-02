@@ -46,6 +46,8 @@ public class MeetingJob
 
     public MeetingMinutes? Minutes { get; set; }
 
+    public ICollection<ActionItem> Actions { get; set; } = new List<ActionItem>();
+
     public void ValidateModeInput()
     {
         if (string.IsNullOrWhiteSpace(OriginalFileName))
