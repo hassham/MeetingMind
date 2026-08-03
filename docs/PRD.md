@@ -4,7 +4,7 @@
 
 **Version:** 3.0
 
-**Status:** Approved for Phase 3
+**Status:** Implemented through P3-07; P3-08 verification in progress
 
 **Product owner:** Hasham Ahmad
 
@@ -24,8 +24,9 @@ Phase 2 completed local production hardening: portable configuration, automated
 verification, bounded retries, long-transcript aggregation, duration reporting,
 safe retention, readiness checks, accessibility, and operational guidance.
 
-Phase 3 is the active delivery cycle. No Phase 3 production feature is complete
-until its backlog package passes its acceptance gate.
+Phase 3 is the active delivery cycle. P3-01 through P3-07 have passed their
+package gates; P3-08 release verification remains open until every final gate
+is evidenced.
 
 ## 3. Phase 3 goals
 

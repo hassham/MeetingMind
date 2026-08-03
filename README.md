@@ -14,15 +14,18 @@ conversion, transcription, minutes generation, and result storage.
 Phase 2 local hardening is complete and was verified on 2026-07-19. The
 sanitized completion evidence is preserved in the
 [Phase 2 verification record](docs/archive/phase2/PHASE2_VERIFICATION.md).
-Phase 3 requirements and architecture are approved and P3-01 documentation
-reconciliation is in progress. Phase 3 production features are not yet
-implemented; the implemented workflow described below remains the Phase 2
-baseline. See the [active backlog](BACKLOG.md) and
+Phase 3 product features are implemented through P3-07. P3-08 release
+verification is in progress: automated gates and a live transcript-only flow
+pass, while provider-dependent live flows and screen-reader verification remain
+explicitly incomplete. See the [active backlog](BACKLOG.md),
+[Phase 3 verification record](docs/archive/phase3/PHASE3_VERIFICATION.md), and
 [Phase 3 plan](docs/phase3/PLAN.md).
 
 The implemented workflow supports:
 
 - Uploading MP3, WAV, M4A, and AAC audio files.
+- Uploading UTF-8 TXT and Markdown transcripts for minutes generation.
+- Choosing transcript-only, full-meeting, or minutes-from-transcript processing.
 - Validating file extension, MIME type, filename, and configurable file size.
 - Returning a job ID without waiting for audio or AI processing.
 - Tracking job stage, status, progress, and errors.
@@ -31,6 +34,8 @@ The implemented workflow supports:
 - Transcribing audio locally with Whisper.net.
 - Generating structured meeting minutes with OpenAI GPT.
 - Viewing minutes and transcripts in the React frontend.
+- Browsing an aggregate dashboard and immutable completed-meeting library.
+- Creating, editing, linking, filtering, and exporting independent actions.
 - Downloading transcript and Markdown minutes files.
 - Reviewing processing history.
 - Retrying failed or cancelled jobs.
@@ -41,18 +46,17 @@ to be run in a trusted local environment.
 ## Processing workflow
 
 ```text
-Upload audio
+Upload audio or transcript and choose a processing mode
   -> Validate and save original file
   -> Create MeetingJob record
   -> Enqueue Hangfire job
   -> Return job ID immediately
 
 MeetingMind.Worker
-  -> Validate stored audio
-  -> Convert to PCM 16-bit, 16 kHz, mono WAV with FFmpeg
-  -> Transcribe locally with Whisper.net
+  -> Validate the stored source
+  -> For audio: convert with FFmpeg and transcribe locally with Whisper.net
   -> Save transcript record and text file
-  -> Generate structured minutes with OpenAI GPT
+  -> When requested: generate structured minutes with OpenAI GPT
   -> Save minutes record and Markdown file
   -> Mark job completed
 ```

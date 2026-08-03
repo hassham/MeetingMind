@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "exportedAtUtc": "2026-08-03T02:27:25.3095218+00:00",
+  "actions": [
+    {
+      "Id": "be554bff-7adc-49c8-99c8-93a6449d9125",
+      "Description": "P3-08 release verification action",
+      "Assignee": "Release verifier",
+      "Notes": "Temporary privacy-safe acceptance record",
+      "dueDate": "2026-08-02",
+      "status": "Completed",
+      "source": "Manual",
+      "meetingId": null,
+      "meetingTitle": "Phase 2 Verification Meeting",
+      "sourceFileName": "p2-short.wav",
+      "CreatedAt": "2026-08-03T02:27:24.904261+00:00",
+      "UpdatedAt": "2026-08-03T02:27:25.081379+00:00",
+      "CompletedAt": "2026-08-03T02:27:25.081271+00:00"
+    }
+  ]
+}

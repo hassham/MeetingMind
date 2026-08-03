@@ -8,8 +8,9 @@ next," see `BACKLOG.md` instead — this file should rarely need edits mid-sprin
 
 MeetingMind AI converts uploaded meeting audio into a transcript and
 structured, AI-generated meeting minutes (decisions, action items, risks,
-next steps). The completed MVP/Phase 2 hardening cycle and the active Phase 3
-product-expansion cycle run as a trusted local application. Cloud deployment is
+next steps). The completed MVP/Phase 2 hardening cycle and Phase 3 features
+through P3-07 run as a trusted local application; P3-08 release verification
+remains active. Cloud deployment is
 a future delivery cycle, not part of Phase 3.
 
 Full specs live in `/docs`:

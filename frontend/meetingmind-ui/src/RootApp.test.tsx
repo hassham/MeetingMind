@@ -149,6 +149,7 @@ describe('application routes and dashboard', () => {
       http.get('*/api/meetings/minutes', () => HttpResponse.json({ skip:0,take:20,total:1,items:[{jobId, title:'Planning', originalFileName:'planning.mp3', sourceType:'Audio', processingMode:'FullMeeting', createdAt:now, startedAt:now, completedAt:now, minutesCreatedAt:now}] })),
       http.get(`*/api/meetings/${jobId}/result`, () => HttpResponse.json({jobId,originalFileName:'planning.mp3',sourceType:'Audio',processingMode:'FullMeeting',createdAt:now,startedAt:now,completedAt:now,hasTranscript:true,title:'Planning',summary:'Summary',attendees:['Hasham'],discussionPoints:['Scope'],decisions:['Approve'],actionItems:[{description:'Write tests',owner:'Hasham',dueDate:'Friday'}],risks:['Schedule'],nextSteps:['Implement']})),
       http.get(`*/api/meetings/${jobId}/transcript`, () => HttpResponse.json({hasTimestamps:true,paragraphs:[{text:'Opening discussion.',startSeconds:65}]})),
+      http.get(`*/api/meetings/${jobId}/actions`, () => HttpResponse.json({skip:0,take:100,total:1,items:[{id:'22222222-2222-2222-2222-222222222222',description:'Publish release notes',assignee:'Hasham',dueDate:'2026-08-04',status:'InProgress',source:'Manual',isOverdue:false}]})),
     )
     const user = userEvent.setup()
     renderRoute('/meetings')
@@ -157,7 +158,23 @@ describe('application routes and dashboard', () => {
     expect(await screen.findByRole('heading',{level:1,name:'Planning'})).toBeInTheDocument()
     expect(screen.getByRole('heading',{name:'Generated action-items snapshot'})).toBeInTheDocument()
     expect(screen.getByText('[01:05]')).toBeInTheDocument()
-    expect(screen.getByText(/Independent action tracking/)).toBeInTheDocument()
+    expect(screen.getByText('Publish release notes')).toBeInTheDocument()
+    expect(screen.getByText('In progress')).toBeInTheDocument()
+    expect(screen.getByRole('link',{name:'View all linked actions'})).toHaveAttribute('href',`/actions?meetingId=${jobId}`)
+  })
+
+  it('applies and clears a meeting filter from the Actions URL', async () => {
+    let requestedMeetingId = ''
+    server.use(http.get('*/api/actions', ({ request }) => {
+      requestedMeetingId = new URL(request.url).searchParams.get('meetingId') ?? ''
+      return HttpResponse.json({ skip:0,take:25,total:0,items:[] })
+    }))
+    const user = userEvent.setup()
+    renderRoute(`/actions?meetingId=${jobId}`)
+    expect(await screen.findByText(`Showing actions linked to meeting ${jobId}.`)).toBeInTheDocument()
+    await waitFor(() => expect(requestedMeetingId).toBe(jobId))
+    await user.click(screen.getByRole('button',{name:'Show all actions'}))
+    await waitFor(() => expect(requestedMeetingId).toBe(''))
   })
 
   it('shows safe empty and not-found minutes states', async () => {

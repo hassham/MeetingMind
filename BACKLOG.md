@@ -10,14 +10,14 @@ preserved in [`docs/phase3/PLAN.md`](docs/phase3/PLAN.md).
 
 Status legend: `TODO` | `IN PROGRESS` | `BLOCKED` | `PARTIAL` | `DONE`
 
-Last updated: 2026-07-28.
+Last updated: 2026-08-03.
 
 ## Current delivery cycle: Phase 3
 
 **Theme:** Flexible meeting inputs, useful dashboards, readable transcripts,
 and independently trackable actions.
 
-**Overall status:** `IN PROGRESS` — P3-07 is complete and P3-08 is next.
+**Overall status:** `IN PROGRESS` — P3-07 is complete and P3-08 verification is active.
 
 ### Phase 3 outcome
 
@@ -104,7 +104,8 @@ Additional tracking rules:
 
 ## Current focus
 
-P3-03 through P3-07 are complete. P3-08 is next.
+P3-03 through P3-07 are complete. P3-08 is in progress with explicitly open
+live provider and screen-reader gates.
 
 ### P3-01 — Reconcile Phase 3 requirements, UX, and contracts
 
@@ -563,6 +564,10 @@ Evidence:
   including primary-route and automated accessibility coverage.
 - The idempotent EF migration script generated successfully and
   `git diff --check` passed.
+- P3-08 release verification found and corrected the missing meeting-detail
+  action context on 2026-08-03. The focused frontend suite passed 33/33, lint
+  and production build passed, and browser verification confirmed bounded
+  linked-action cards plus `/actions?meetingId={jobId}` filtering.
 
 Notes:
 
@@ -574,27 +579,29 @@ Notes:
 
 ### P3-08 — Phase 3 release verification and documentation
 
-**Status:** `TODO`
+**Status:** `IN PROGRESS`
 
 **Depends on:** P3-07.
-**Completion:** Not started.
+**Started:** 2026-08-03.
+**Completion:** In progress; provider-dependent live flows and screen-reader
+verification remain open.
 
-- [ ] Run `dotnet build MeetingMind.sln`.
-- [ ] Run `dotnet test MeetingMind.sln`.
-- [ ] Run frontend lint, production build, and automated tests.
+- [x] Run `dotnet build MeetingMind.sln`.
+- [x] Run `dotnet test MeetingMind.sln`.
+- [x] Run frontend lint, production build, and automated tests.
 - [ ] Execute and record local end-to-end success/failure/retry scenarios for
       all three processing modes.
-- [ ] Verify structured transcript formatting and timestamps with representative
+- [x] Verify structured transcript formatting and timestamps with representative
       audio.
-- [ ] Verify dashboard totals against known seeded/local records.
-- [ ] Verify minutes navigation, immutable meeting behavior, manual/generated
+- [x] Verify dashboard totals against known seeded/local records.
+- [x] Verify minutes navigation, immutable meeting behavior, manual/generated
       actions, optional links, conflicts, filtering, and CSV/JSON exports.
-- [ ] Upgrade a copy of representative Phase 2 data and verify job migration and
+- [x] Upgrade a copy of representative Phase 2 data and verify job migration and
       idempotent legacy action backfill.
-- [ ] Verify a clean database can be created from migrations.
+- [x] Verify a clean database can be created from migrations.
 - [ ] Complete manual responsive, keyboard, focus, screen-reader announcement,
       and color-contrast checks for primary Phase 3 states.
-- [ ] Update README, local run/test guidance, API documentation, PRD, FSD, SAD,
+- [x] Update README, local run/test guidance, API documentation, PRD, FSD, SAD,
       AGENTS.md, and WORKFLOW.md where final behavior requires it.
 - [ ] Write the Phase 3 Completion Report and archive the completed backlog and
       decision evidence under `docs/archive/phase3/`.
@@ -609,7 +616,26 @@ Acceptance criteria:
 - No Phase 3 package or checklist item remains `TODO`, `PARTIAL`, `IN PROGRESS`,
   or `BLOCKED`.
 
-Evidence: Pending.
+Evidence:
+
+- [`docs/archive/phase3/PHASE3_VERIFICATION.md`](docs/archive/phase3/PHASE3_VERIFICATION.md)
+  records sanitized automated, readiness, TranscriptOnly, database-truth,
+  action/export, and real-browser evidence plus the remaining gates.
+- Decision records:
+  [`docs/archive/phase3/QUESTIONS_p3_08_release_verification.md`](docs/archive/phase3/QUESTIONS_p3_08_release_verification.md)
+  and
+  [`docs/archive/phase3/QUESTIONS_p3_08_meeting_action_context_defect.md`](docs/archive/phase3/QUESTIONS_p3_08_meeting_action_context_defect.md).
+
+Notes:
+
+- Approved P3-08 Q3 limits this live pass to TranscriptOnly; live FullMeeting,
+  MinutesFromTranscript, and automatic-retry evidence remain unchecked.
+- Approved P3-08 Q5 omits screen-reader verification, so the combined manual
+  accessibility item remains unchecked.
+- Approved P3-08 Q4 accepts the passing PostgreSQL migration/upgrade suites as
+  the representative Phase 2 upgrade exercise.
+- The completed backlog is intentionally not archived while P3-08 is
+  `IN PROGRESS`.
 
 ## Phase 3 completion gate
 

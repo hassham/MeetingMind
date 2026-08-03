@@ -3,7 +3,7 @@ import DownloadIcon from '@mui/icons-material/Download'
 import { Alert, Box, Button, Card, CardActions, CardContent, Chip, Container, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Pagination, Select, Stack, TextField, Typography } from '@mui/material'
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 type Status = 'Open' | 'InProgress' | 'Blocked' | 'Completed' | 'Cancelled'
 type ActionItem = { id: string; description: string; assignee: string | null; notes: string | null; dueDate: string | null; status: Status; source: 'Generated' | 'Manual'; meetingId: string | null; meetingTitle: string | null; sourceFileName: string | null; version: string; isOverdue: boolean }
@@ -12,6 +12,8 @@ type Draft = { description: string; assignee: string; notes: string; dueDate: st
 const blank: Draft = { description: '', assignee: '', notes: '', dueDate: '', status: 'Open', meetingId: '', version: '' }
 
 export default function ActionsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const meetingId = searchParams.get('meetingId') ?? ''
   const [data, setData] = useState<ActionPage | null>(null)
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
@@ -25,10 +27,10 @@ export default function ActionsPage() {
 
   const load = useCallback(async () => {
     try {
-      const response = await axios.get<ActionPage>('/api/actions', { params: { skip: (page - 1) * 25, take: 25, status: status || undefined, assignee: assignee || undefined, due: due || undefined, source: source || undefined } })
+      const response = await axios.get<ActionPage>('/api/actions', { params: { skip: (page - 1) * 25, take: 25, status: status || undefined, assignee: assignee || undefined, due: due || undefined, source: source || undefined, meetingId: meetingId || undefined } })
       setData(response.data); setError('')
     } catch { setError('Actions could not be loaded.') }
-  }, [page, status, assignee, due, source])
+  }, [page, status, assignee, due, source, meetingId])
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer) }, [load])
 
   const open = (item?: ActionItem) => { setEditing(item ?? 'new'); setDraft(item ? { description: item.description, assignee: item.assignee ?? '', notes: item.notes ?? '', dueDate: item.dueDate ?? '', status: item.status, meetingId: item.meetingId ?? '', version: item.version } : blank); setError('') }
@@ -44,11 +46,12 @@ export default function ActionsPage() {
     }
   }
   const remove = async () => { if (!deleting) return; try { await axios.delete(`/api/actions/${deleting.id}`); setDeleting(null); await load() } catch { setError('The action could not be deleted.') } }
-  const exportActions = (format: 'csv' | 'json') => { const params = new URLSearchParams({ format }); if (status) params.set('status', status); if (assignee) params.set('assignee', assignee); if (due) params.set('due', due); if (source) params.set('source', source); window.location.assign(`/api/actions/export?${params}`) }
+  const exportActions = (format: 'csv' | 'json') => { const params = new URLSearchParams({ format }); if (status) params.set('status', status); if (assignee) params.set('assignee', assignee); if (due) params.set('due', due); if (source) params.set('source', source); if (meetingId) params.set('meetingId', meetingId); window.location.assign(`/api/actions/export?${params}`) }
 
   return <Container component="main" maxWidth="xl" className="route-page"><Stack spacing={3}>
     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={2}><Box><Typography component="h1" variant="h4" fontWeight={800}>Actions</Typography><Typography color="text.secondary">Track generated and manual work independently from meetings.</Typography></Box><Stack direction="row" gap={1}><Button startIcon={<DownloadIcon />} onClick={() => exportActions('csv')}>CSV</Button><Button startIcon={<DownloadIcon />} onClick={() => exportActions('json')}>JSON</Button><Button variant="contained" startIcon={<AddIcon />} onClick={() => open()}>New action</Button></Stack></Stack>
     {error && !editing ? <Alert severity="error">{error}</Alert> : null}
+    {meetingId ? <Alert severity="info" action={<Button color="inherit" onClick={() => { setSearchParams({}); setPage(1) }}>Show all actions</Button>}>Showing actions linked to meeting {meetingId}.</Alert> : null}
     <Stack direction={{ xs: 'column', md: 'row' }} gap={2} className="surface" p={2}>
       <FormControl size="small" sx={{ minWidth: 150 }}><InputLabel>Status</InputLabel><Select label="Status" value={status} onChange={e => { setStatus(e.target.value); setPage(1) }}><MenuItem value="">All</MenuItem>{statuses.map(x => <MenuItem key={x} value={x}>{label(x)}</MenuItem>)}</Select></FormControl>
       <TextField size="small" label="Assignee contains" value={assignee} onChange={e => { setAssignee(e.target.value); setPage(1) }} />

@@ -1,0 +1,383 @@
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (40ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "MigrationId", "ProductVersion"
+      FROM "__EFMigrationsHistory"
+      ORDER BY "MigrationId";
+warn: DatabaseStartup[0]
+      Could not verify the migrated database schema; attempt 1 of 15. Retrying in 2 seconds.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "MigrationId", "ProductVersion"
+      FROM "__EFMigrationsHistory"
+      ORDER BY "MigrationId";
+info: DatabaseStartup[0]
+      Worker confirmed that the development database schema is ready.
+info: Hangfire.PostgreSql.PostgreSqlStorage[0]
+      Start installing Hangfire SQL objects...
+info: Hangfire.PostgreSql.PostgreSqlStorage[0]
+      Hangfire SQL objects installed.
+info: Hangfire.BackgroundJobServer[0]
+      Starting Hangfire Server using job storage: 'PostgreSQL Server: Host: 127.0.0.1, DB: meetingmind, Schema: hangfire'
+info: Hangfire.BackgroundJobServer[0]
+      Using the following options for PostgreSQL job storage:
+info: Hangfire.BackgroundJobServer[0]
+          Queue poll interval: 00:00:15.
+info: Hangfire.BackgroundJobServer[0]
+          Invisibility timeout: 00:30:00.
+info: Hangfire.BackgroundJobServer[0]
+          Use sliding invisibility timeout: False.
+info: Hangfire.BackgroundJobServer[0]
+      Using the following options for Hangfire Server:
+          Worker count: 20
+          Listening queues: 'default'
+          Shutdown timeout: 00:00:15
+          Schedule polling interval: 00:00:15
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\work\Meetingminutes\MeetingMind\src\MeetingMind.Worker
+info: Hangfire.Server.BackgroundServerProcess[0]
+      Server business:9080:25ac9329 successfully announced in 20.2091 ms
+info: Hangfire.Server.BackgroundServerProcess[0]
+      Server business:9080:25ac9329 is starting the registered dispatchers: ServerWatchdog, ServerJobCancellationWatcher, ExpirationManager, CountersAggregator, Worker, DelayedJobScheduler, RecurringJobScheduler...
+info: Hangfire.Server.ServerWatchdog[0]
+      1 servers were removed due to timeout
+info: Hangfire.Server.BackgroundServerProcess[0]
+      Server business:9080:25ac9329 all the dispatchers started
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (5ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT m."MeetingJobId"
+      FROM "MeetingMinutes" AS m
+      WHERE m."ActionsSeededAt" IS NULL
+      ORDER BY m."CreatedAt"
+      LIMIT @__p_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (7ms) [Parameters=[@__meetingId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."ActionItemsJson", m."ActionsSeededAt", m."CreatedAt", m."DecisionsJson", m."FullMinutesJson", m."MeetingJobId", m."MinutesFilePath", m."NextStepsJson", m."RisksJson", m."Summary", m."Title", m0."Id", m0."AutomaticRetryCount", m0."AutomaticRetryLimit", m0."CompletedAt", m0."CreatedAt", m0."ErrorCode", m0."ErrorMessage", m0."HangfireJobId", m0."NextRetryAt", m0."OriginalFileName", m0."OriginalFilePath", m0."ProcessedFilePath", m0."ProcessingMode", m0."Progress", m0."SourceAudioDurationSeconds", m0."Stage", m0."StartedAt", m0."Status", m0."UpdatedAt"
+      FROM "MeetingMinutes" AS m
+      INNER JOIN "MeetingJobs" AS m0 ON m."MeetingJobId" = m0."Id"
+      WHERE m."MeetingJobId" = @__meetingId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (7ms) [Parameters=[@__keys_0='?' (DbType = Object)], CommandType='Text', CommandTimeout='30']
+      SELECT a."GeneratedSourceKey"
+      FROM "ActionItems" AS a
+      WHERE a."GeneratedSourceKey" IS NOT NULL AND a."GeneratedSourceKey" = ANY (@__keys_0)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (9ms) [Parameters=[@p1='?' (DbType = Guid), @p0='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      UPDATE "MeetingMinutes" SET "ActionsSeededAt" = @p0
+      WHERE "Id" = @p1;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@__meetingId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."ActionItemsJson", m."ActionsSeededAt", m."CreatedAt", m."DecisionsJson", m."FullMinutesJson", m."MeetingJobId", m."MinutesFilePath", m."NextStepsJson", m."RisksJson", m."Summary", m."Title", m0."Id", m0."AutomaticRetryCount", m0."AutomaticRetryLimit", m0."CompletedAt", m0."CreatedAt", m0."ErrorCode", m0."ErrorMessage", m0."HangfireJobId", m0."NextRetryAt", m0."OriginalFileName", m0."OriginalFilePath", m0."ProcessedFilePath", m0."ProcessingMode", m0."Progress", m0."SourceAudioDurationSeconds", m0."Stage", m0."StartedAt", m0."Status", m0."UpdatedAt"
+      FROM "MeetingMinutes" AS m
+      INNER JOIN "MeetingJobs" AS m0 ON m."MeetingJobId" = m0."Id"
+      WHERE m."MeetingJobId" = @__meetingId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@__keys_0='?' (DbType = Object)], CommandType='Text', CommandTimeout='30']
+      SELECT a."GeneratedSourceKey"
+      FROM "ActionItems" AS a
+      WHERE a."GeneratedSourceKey" IS NOT NULL AND a."GeneratedSourceKey" = ANY (@__keys_0)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (6ms) [Parameters=[@p1='?' (DbType = Guid), @p0='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      UPDATE "MeetingMinutes" SET "ActionsSeededAt" = @p0
+      WHERE "Id" = @p1;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@__meetingId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."ActionItemsJson", m."ActionsSeededAt", m."CreatedAt", m."DecisionsJson", m."FullMinutesJson", m."MeetingJobId", m."MinutesFilePath", m."NextStepsJson", m."RisksJson", m."Summary", m."Title", m0."Id", m0."AutomaticRetryCount", m0."AutomaticRetryLimit", m0."CompletedAt", m0."CreatedAt", m0."ErrorCode", m0."ErrorMessage", m0."HangfireJobId", m0."NextRetryAt", m0."OriginalFileName", m0."OriginalFilePath", m0."ProcessedFilePath", m0."ProcessingMode", m0."Progress", m0."SourceAudioDurationSeconds", m0."Stage", m0."StartedAt", m0."Status", m0."UpdatedAt"
+      FROM "MeetingMinutes" AS m
+      INNER JOIN "MeetingJobs" AS m0 ON m."MeetingJobId" = m0."Id"
+      WHERE m."MeetingJobId" = @__meetingId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__keys_0='?' (DbType = Object)], CommandType='Text', CommandTimeout='30']
+      SELECT a."GeneratedSourceKey"
+      FROM "ActionItems" AS a
+      WHERE a."GeneratedSourceKey" IS NOT NULL AND a."GeneratedSourceKey" = ANY (@__keys_0)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (5ms) [Parameters=[@p1='?' (DbType = Guid), @p0='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      UPDATE "MeetingMinutes" SET "ActionsSeededAt" = @p0
+      WHERE "Id" = @p1;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (5ms) [Parameters=[@__meetingId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."ActionItemsJson", m."ActionsSeededAt", m."CreatedAt", m."DecisionsJson", m."FullMinutesJson", m."MeetingJobId", m."MinutesFilePath", m."NextStepsJson", m."RisksJson", m."Summary", m."Title", m0."Id", m0."AutomaticRetryCount", m0."AutomaticRetryLimit", m0."CompletedAt", m0."CreatedAt", m0."ErrorCode", m0."ErrorMessage", m0."HangfireJobId", m0."NextRetryAt", m0."OriginalFileName", m0."OriginalFilePath", m0."ProcessedFilePath", m0."ProcessingMode", m0."Progress", m0."SourceAudioDurationSeconds", m0."Stage", m0."StartedAt", m0."Status", m0."UpdatedAt"
+      FROM "MeetingMinutes" AS m
+      INNER JOIN "MeetingJobs" AS m0 ON m."MeetingJobId" = m0."Id"
+      WHERE m."MeetingJobId" = @__meetingId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@__keys_0='?' (DbType = Object)], CommandType='Text', CommandTimeout='30']
+      SELECT a."GeneratedSourceKey"
+      FROM "ActionItems" AS a
+      WHERE a."GeneratedSourceKey" IS NOT NULL AND a."GeneratedSourceKey" = ANY (@__keys_0)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (6ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?', @p2='?' (DbType = DateTime), @p3='?' (DbType = DateTime), @p4='?', @p5='?' (DbType = Date), @p6='?', @p7='?' (DbType = Guid), @p8='?', @p9='?', @p10='?', @p11='?', @p12='?', @p13='?' (DbType = DateTime), @p14='?' (DbType = Int64), @p16='?' (DbType = Guid), @p15='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "ActionItems" ("Id", "Assignee", "CompletedAt", "CreatedAt", "Description", "DueDate", "GeneratedSourceKey", "MeetingJobId", "Notes", "ProvenanceMeetingTitle", "ProvenanceSourceFileName", "Source", "Status", "UpdatedAt", "Version")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14);
+      UPDATE "MeetingMinutes" SET "ActionsSeededAt" = @p15
+      WHERE "Id" = @p16;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@__meetingId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."ActionItemsJson", m."ActionsSeededAt", m."CreatedAt", m."DecisionsJson", m."FullMinutesJson", m."MeetingJobId", m."MinutesFilePath", m."NextStepsJson", m."RisksJson", m."Summary", m."Title", m0."Id", m0."AutomaticRetryCount", m0."AutomaticRetryLimit", m0."CompletedAt", m0."CreatedAt", m0."ErrorCode", m0."ErrorMessage", m0."HangfireJobId", m0."NextRetryAt", m0."OriginalFileName", m0."OriginalFilePath", m0."ProcessedFilePath", m0."ProcessingMode", m0."Progress", m0."SourceAudioDurationSeconds", m0."Stage", m0."StartedAt", m0."Status", m0."UpdatedAt"
+      FROM "MeetingMinutes" AS m
+      INNER JOIN "MeetingJobs" AS m0 ON m."MeetingJobId" = m0."Id"
+      WHERE m."MeetingJobId" = @__meetingId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__keys_0='?' (DbType = Object)], CommandType='Text', CommandTimeout='30']
+      SELECT a."GeneratedSourceKey"
+      FROM "ActionItems" AS a
+      WHERE a."GeneratedSourceKey" IS NOT NULL AND a."GeneratedSourceKey" = ANY (@__keys_0)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?', @p2='?' (DbType = DateTime), @p3='?' (DbType = DateTime), @p4='?', @p5='?' (DbType = Date), @p6='?', @p7='?' (DbType = Guid), @p8='?', @p9='?', @p10='?', @p11='?', @p12='?', @p13='?' (DbType = DateTime), @p14='?' (DbType = Int64), @p15='?' (DbType = Guid), @p16='?', @p17='?' (DbType = DateTime), @p18='?' (DbType = DateTime), @p19='?', @p20='?' (DbType = Date), @p21='?', @p22='?' (DbType = Guid), @p23='?', @p24='?', @p25='?', @p26='?', @p27='?', @p28='?' (DbType = DateTime), @p29='?' (DbType = Int64), @p31='?' (DbType = Guid), @p30='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "ActionItems" ("Id", "Assignee", "CompletedAt", "CreatedAt", "Description", "DueDate", "GeneratedSourceKey", "MeetingJobId", "Notes", "ProvenanceMeetingTitle", "ProvenanceSourceFileName", "Source", "Status", "UpdatedAt", "Version")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14);
+      INSERT INTO "ActionItems" ("Id", "Assignee", "CompletedAt", "CreatedAt", "Description", "DueDate", "GeneratedSourceKey", "MeetingJobId", "Notes", "ProvenanceMeetingTitle", "ProvenanceSourceFileName", "Source", "Status", "UpdatedAt", "Version")
+      VALUES (@p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, @p27, @p28, @p29);
+      UPDATE "MeetingMinutes" SET "ActionsSeededAt" = @p30
+      WHERE "Id" = @p31;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__meetingId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."ActionItemsJson", m."ActionsSeededAt", m."CreatedAt", m."DecisionsJson", m."FullMinutesJson", m."MeetingJobId", m."MinutesFilePath", m."NextStepsJson", m."RisksJson", m."Summary", m."Title", m0."Id", m0."AutomaticRetryCount", m0."AutomaticRetryLimit", m0."CompletedAt", m0."CreatedAt", m0."ErrorCode", m0."ErrorMessage", m0."HangfireJobId", m0."NextRetryAt", m0."OriginalFileName", m0."OriginalFilePath", m0."ProcessedFilePath", m0."ProcessingMode", m0."Progress", m0."SourceAudioDurationSeconds", m0."Stage", m0."StartedAt", m0."Status", m0."UpdatedAt"
+      FROM "MeetingMinutes" AS m
+      INNER JOIN "MeetingJobs" AS m0 ON m."MeetingJobId" = m0."Id"
+      WHERE m."MeetingJobId" = @__meetingId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__keys_0='?' (DbType = Object)], CommandType='Text', CommandTimeout='30']
+      SELECT a."GeneratedSourceKey"
+      FROM "ActionItems" AS a
+      WHERE a."GeneratedSourceKey" IS NOT NULL AND a."GeneratedSourceKey" = ANY (@__keys_0)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?', @p2='?' (DbType = DateTime), @p3='?' (DbType = DateTime), @p4='?', @p5='?' (DbType = Date), @p6='?', @p7='?' (DbType = Guid), @p8='?', @p9='?', @p10='?', @p11='?', @p12='?', @p13='?' (DbType = DateTime), @p14='?' (DbType = Int64), @p15='?' (DbType = Guid), @p16='?', @p17='?' (DbType = DateTime), @p18='?' (DbType = DateTime), @p19='?', @p20='?' (DbType = Date), @p21='?', @p22='?' (DbType = Guid), @p23='?', @p24='?', @p25='?', @p26='?', @p27='?', @p28='?' (DbType = DateTime), @p29='?' (DbType = Int64), @p31='?' (DbType = Guid), @p30='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "ActionItems" ("Id", "Assignee", "CompletedAt", "CreatedAt", "Description", "DueDate", "GeneratedSourceKey", "MeetingJobId", "Notes", "ProvenanceMeetingTitle", "ProvenanceSourceFileName", "Source", "Status", "UpdatedAt", "Version")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14);
+      INSERT INTO "ActionItems" ("Id", "Assignee", "CompletedAt", "CreatedAt", "Description", "DueDate", "GeneratedSourceKey", "MeetingJobId", "Notes", "ProvenanceMeetingTitle", "ProvenanceSourceFileName", "Source", "Status", "UpdatedAt", "Version")
+      VALUES (@p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, @p27, @p28, @p29);
+      UPDATE "MeetingMinutes" SET "ActionsSeededAt" = @p30
+      WHERE "Id" = @p31;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__meetingId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."ActionItemsJson", m."ActionsSeededAt", m."CreatedAt", m."DecisionsJson", m."FullMinutesJson", m."MeetingJobId", m."MinutesFilePath", m."NextStepsJson", m."RisksJson", m."Summary", m."Title", m0."Id", m0."AutomaticRetryCount", m0."AutomaticRetryLimit", m0."CompletedAt", m0."CreatedAt", m0."ErrorCode", m0."ErrorMessage", m0."HangfireJobId", m0."NextRetryAt", m0."OriginalFileName", m0."OriginalFilePath", m0."ProcessedFilePath", m0."ProcessingMode", m0."Progress", m0."SourceAudioDurationSeconds", m0."Stage", m0."StartedAt", m0."Status", m0."UpdatedAt"
+      FROM "MeetingMinutes" AS m
+      INNER JOIN "MeetingJobs" AS m0 ON m."MeetingJobId" = m0."Id"
+      WHERE m."MeetingJobId" = @__meetingId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__keys_0='?' (DbType = Object)], CommandType='Text', CommandTimeout='30']
+      SELECT a."GeneratedSourceKey"
+      FROM "ActionItems" AS a
+      WHERE a."GeneratedSourceKey" IS NOT NULL AND a."GeneratedSourceKey" = ANY (@__keys_0)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?', @p2='?' (DbType = DateTime), @p3='?' (DbType = DateTime), @p4='?', @p5='?' (DbType = Date), @p6='?', @p7='?' (DbType = Guid), @p8='?', @p9='?', @p10='?', @p11='?', @p12='?', @p13='?' (DbType = DateTime), @p14='?' (DbType = Int64), @p16='?' (DbType = Guid), @p15='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "ActionItems" ("Id", "Assignee", "CompletedAt", "CreatedAt", "Description", "DueDate", "GeneratedSourceKey", "MeetingJobId", "Notes", "ProvenanceMeetingTitle", "ProvenanceSourceFileName", "Source", "Status", "UpdatedAt", "Version")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14);
+      UPDATE "MeetingMinutes" SET "ActionsSeededAt" = @p15
+      WHERE "Id" = @p16;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__meetingId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."ActionItemsJson", m."ActionsSeededAt", m."CreatedAt", m."DecisionsJson", m."FullMinutesJson", m."MeetingJobId", m."MinutesFilePath", m."NextStepsJson", m."RisksJson", m."Summary", m."Title", m0."Id", m0."AutomaticRetryCount", m0."AutomaticRetryLimit", m0."CompletedAt", m0."CreatedAt", m0."ErrorCode", m0."ErrorMessage", m0."HangfireJobId", m0."NextRetryAt", m0."OriginalFileName", m0."OriginalFilePath", m0."ProcessedFilePath", m0."ProcessingMode", m0."Progress", m0."SourceAudioDurationSeconds", m0."Stage", m0."StartedAt", m0."Status", m0."UpdatedAt"
+      FROM "MeetingMinutes" AS m
+      INNER JOIN "MeetingJobs" AS m0 ON m."MeetingJobId" = m0."Id"
+      WHERE m."MeetingJobId" = @__meetingId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__keys_0='?' (DbType = Object)], CommandType='Text', CommandTimeout='30']
+      SELECT a."GeneratedSourceKey"
+      FROM "ActionItems" AS a
+      WHERE a."GeneratedSourceKey" IS NOT NULL AND a."GeneratedSourceKey" = ANY (@__keys_0)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?', @p2='?' (DbType = DateTime), @p3='?' (DbType = DateTime), @p4='?', @p5='?' (DbType = Date), @p6='?', @p7='?' (DbType = Guid), @p8='?', @p9='?', @p10='?', @p11='?', @p12='?', @p13='?' (DbType = DateTime), @p14='?' (DbType = Int64), @p15='?' (DbType = Guid), @p16='?', @p17='?' (DbType = DateTime), @p18='?' (DbType = DateTime), @p19='?', @p20='?' (DbType = Date), @p21='?', @p22='?' (DbType = Guid), @p23='?', @p24='?', @p25='?', @p26='?', @p27='?', @p28='?' (DbType = DateTime), @p29='?' (DbType = Int64), @p30='?' (DbType = Guid), @p31='?', @p32='?' (DbType = DateTime), @p33='?' (DbType = DateTime), @p34='?', @p35='?' (DbType = Date), @p36='?', @p37='?' (DbType = Guid), @p38='?', @p39='?', @p40='?', @p41='?', @p42='?', @p43='?' (DbType = DateTime), @p44='?' (DbType = Int64), @p46='?' (DbType = Guid), @p45='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "ActionItems" ("Id", "Assignee", "CompletedAt", "CreatedAt", "Description", "DueDate", "GeneratedSourceKey", "MeetingJobId", "Notes", "ProvenanceMeetingTitle", "ProvenanceSourceFileName", "Source", "Status", "UpdatedAt", "Version")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14);
+      INSERT INTO "ActionItems" ("Id", "Assignee", "CompletedAt", "CreatedAt", "Description", "DueDate", "GeneratedSourceKey", "MeetingJobId", "Notes", "ProvenanceMeetingTitle", "ProvenanceSourceFileName", "Source", "Status", "UpdatedAt", "Version")
+      VALUES (@p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, @p27, @p28, @p29);
+      INSERT INTO "ActionItems" ("Id", "Assignee", "CompletedAt", "CreatedAt", "Description", "DueDate", "GeneratedSourceKey", "MeetingJobId", "Notes", "ProvenanceMeetingTitle", "ProvenanceSourceFileName", "Source", "Status", "UpdatedAt", "Version")
+      VALUES (@p30, @p31, @p32, @p33, @p34, @p35, @p36, @p37, @p38, @p39, @p40, @p41, @p42, @p43, @p44);
+      UPDATE "MeetingMinutes" SET "ActionsSeededAt" = @p45
+      WHERE "Id" = @p46;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__meetingId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."ActionItemsJson", m."ActionsSeededAt", m."CreatedAt", m."DecisionsJson", m."FullMinutesJson", m."MeetingJobId", m."MinutesFilePath", m."NextStepsJson", m."RisksJson", m."Summary", m."Title", m0."Id", m0."AutomaticRetryCount", m0."AutomaticRetryLimit", m0."CompletedAt", m0."CreatedAt", m0."ErrorCode", m0."ErrorMessage", m0."HangfireJobId", m0."NextRetryAt", m0."OriginalFileName", m0."OriginalFilePath", m0."ProcessedFilePath", m0."ProcessingMode", m0."Progress", m0."SourceAudioDurationSeconds", m0."Stage", m0."StartedAt", m0."Status", m0."UpdatedAt"
+      FROM "MeetingMinutes" AS m
+      INNER JOIN "MeetingJobs" AS m0 ON m."MeetingJobId" = m0."Id"
+      WHERE m."MeetingJobId" = @__meetingId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__keys_0='?' (DbType = Object)], CommandType='Text', CommandTimeout='30']
+      SELECT a."GeneratedSourceKey"
+      FROM "ActionItems" AS a
+      WHERE a."GeneratedSourceKey" IS NOT NULL AND a."GeneratedSourceKey" = ANY (@__keys_0)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?', @p2='?' (DbType = DateTime), @p3='?' (DbType = DateTime), @p4='?', @p5='?' (DbType = Date), @p6='?', @p7='?' (DbType = Guid), @p8='?', @p9='?', @p10='?', @p11='?', @p12='?', @p13='?' (DbType = DateTime), @p14='?' (DbType = Int64), @p16='?' (DbType = Guid), @p15='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "ActionItems" ("Id", "Assignee", "CompletedAt", "CreatedAt", "Description", "DueDate", "GeneratedSourceKey", "MeetingJobId", "Notes", "ProvenanceMeetingTitle", "ProvenanceSourceFileName", "Source", "Status", "UpdatedAt", "Version")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14);
+      UPDATE "MeetingMinutes" SET "ActionsSeededAt" = @p15
+      WHERE "Id" = @p16;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__meetingId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."ActionItemsJson", m."ActionsSeededAt", m."CreatedAt", m."DecisionsJson", m."FullMinutesJson", m."MeetingJobId", m."MinutesFilePath", m."NextStepsJson", m."RisksJson", m."Summary", m."Title", m0."Id", m0."AutomaticRetryCount", m0."AutomaticRetryLimit", m0."CompletedAt", m0."CreatedAt", m0."ErrorCode", m0."ErrorMessage", m0."HangfireJobId", m0."NextRetryAt", m0."OriginalFileName", m0."OriginalFilePath", m0."ProcessedFilePath", m0."ProcessingMode", m0."Progress", m0."SourceAudioDurationSeconds", m0."Stage", m0."StartedAt", m0."Status", m0."UpdatedAt"
+      FROM "MeetingMinutes" AS m
+      INNER JOIN "MeetingJobs" AS m0 ON m."MeetingJobId" = m0."Id"
+      WHERE m."MeetingJobId" = @__meetingId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__keys_0='?' (DbType = Object)], CommandType='Text', CommandTimeout='30']
+      SELECT a."GeneratedSourceKey"
+      FROM "ActionItems" AS a
+      WHERE a."GeneratedSourceKey" IS NOT NULL AND a."GeneratedSourceKey" = ANY (@__keys_0)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?', @p2='?' (DbType = DateTime), @p3='?' (DbType = DateTime), @p4='?', @p5='?' (DbType = Date), @p6='?', @p7='?' (DbType = Guid), @p8='?', @p9='?', @p10='?', @p11='?', @p12='?', @p13='?' (DbType = DateTime), @p14='?' (DbType = Int64), @p16='?' (DbType = Guid), @p15='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "ActionItems" ("Id", "Assignee", "CompletedAt", "CreatedAt", "Description", "DueDate", "GeneratedSourceKey", "MeetingJobId", "Notes", "ProvenanceMeetingTitle", "ProvenanceSourceFileName", "Source", "Status", "UpdatedAt", "Version")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14);
+      UPDATE "MeetingMinutes" SET "ActionsSeededAt" = @p15
+      WHERE "Id" = @p16;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__meetingId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."ActionItemsJson", m."ActionsSeededAt", m."CreatedAt", m."DecisionsJson", m."FullMinutesJson", m."MeetingJobId", m."MinutesFilePath", m."NextStepsJson", m."RisksJson", m."Summary", m."Title", m0."Id", m0."AutomaticRetryCount", m0."AutomaticRetryLimit", m0."CompletedAt", m0."CreatedAt", m0."ErrorCode", m0."ErrorMessage", m0."HangfireJobId", m0."NextRetryAt", m0."OriginalFileName", m0."OriginalFilePath", m0."ProcessedFilePath", m0."ProcessingMode", m0."Progress", m0."SourceAudioDurationSeconds", m0."Stage", m0."StartedAt", m0."Status", m0."UpdatedAt"
+      FROM "MeetingMinutes" AS m
+      INNER JOIN "MeetingJobs" AS m0 ON m."MeetingJobId" = m0."Id"
+      WHERE m."MeetingJobId" = @__meetingId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__keys_0='?' (DbType = Object)], CommandType='Text', CommandTimeout='30']
+      SELECT a."GeneratedSourceKey"
+      FROM "ActionItems" AS a
+      WHERE a."GeneratedSourceKey" IS NOT NULL AND a."GeneratedSourceKey" = ANY (@__keys_0)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?', @p2='?' (DbType = DateTime), @p3='?' (DbType = DateTime), @p4='?', @p5='?' (DbType = Date), @p6='?', @p7='?' (DbType = Guid), @p8='?', @p9='?', @p10='?', @p11='?', @p12='?', @p13='?' (DbType = DateTime), @p14='?' (DbType = Int64), @p16='?' (DbType = Guid), @p15='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "ActionItems" ("Id", "Assignee", "CompletedAt", "CreatedAt", "Description", "DueDate", "GeneratedSourceKey", "MeetingJobId", "Notes", "ProvenanceMeetingTitle", "ProvenanceSourceFileName", "Source", "Status", "UpdatedAt", "Version")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14);
+      UPDATE "MeetingMinutes" SET "ActionsSeededAt" = @p15
+      WHERE "Id" = @p16;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__meetingId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."ActionItemsJson", m."ActionsSeededAt", m."CreatedAt", m."DecisionsJson", m."FullMinutesJson", m."MeetingJobId", m."MinutesFilePath", m."NextStepsJson", m."RisksJson", m."Summary", m."Title", m0."Id", m0."AutomaticRetryCount", m0."AutomaticRetryLimit", m0."CompletedAt", m0."CreatedAt", m0."ErrorCode", m0."ErrorMessage", m0."HangfireJobId", m0."NextRetryAt", m0."OriginalFileName", m0."OriginalFilePath", m0."ProcessedFilePath", m0."ProcessingMode", m0."Progress", m0."SourceAudioDurationSeconds", m0."Stage", m0."StartedAt", m0."Status", m0."UpdatedAt"
+      FROM "MeetingMinutes" AS m
+      INNER JOIN "MeetingJobs" AS m0 ON m."MeetingJobId" = m0."Id"
+      WHERE m."MeetingJobId" = @__meetingId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__keys_0='?' (DbType = Object)], CommandType='Text', CommandTimeout='30']
+      SELECT a."GeneratedSourceKey"
+      FROM "ActionItems" AS a
+      WHERE a."GeneratedSourceKey" IS NOT NULL AND a."GeneratedSourceKey" = ANY (@__keys_0)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?', @p2='?' (DbType = DateTime), @p3='?' (DbType = DateTime), @p4='?', @p5='?' (DbType = Date), @p6='?', @p7='?' (DbType = Guid), @p8='?', @p9='?', @p10='?', @p11='?', @p12='?', @p13='?' (DbType = DateTime), @p14='?' (DbType = Int64), @p16='?' (DbType = Guid), @p15='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "ActionItems" ("Id", "Assignee", "CompletedAt", "CreatedAt", "Description", "DueDate", "GeneratedSourceKey", "MeetingJobId", "Notes", "ProvenanceMeetingTitle", "ProvenanceSourceFileName", "Source", "Status", "UpdatedAt", "Version")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14);
+      UPDATE "MeetingMinutes" SET "ActionsSeededAt" = @p15
+      WHERE "Id" = @p16;
+info: MeetingMind.Worker.Jobs.ActionBackfillJob[0]
+      Action backfill processed 12 meetings and created 13 actions
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__meetingJobId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."AutomaticRetryCount", m."AutomaticRetryLimit", m."CompletedAt", m."CreatedAt", m."ErrorCode", m."ErrorMessage", m."HangfireJobId", m."NextRetryAt", m."OriginalFileName", m."OriginalFilePath", m."ProcessedFilePath", m."ProcessingMode", m."Progress", m."SourceAudioDurationSeconds", m."Stage", m."StartedAt", m."Status", m."UpdatedAt"
+      FROM "MeetingJobs" AS m
+      WHERE m."Id" = @__meetingJobId_0
+      LIMIT 2
+info: MeetingMind.Worker.Jobs.MeetingProcessingJob[0]
+      Meeting processing event for job a507435f-de4e-46bd-a859-13d2f011b1ef; stage Validating; outcome Started; attempt 1; progress 0; elapsed 18 ms
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__meetingJobId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."AutomaticRetryCount", m."AutomaticRetryLimit", m."CompletedAt", m."CreatedAt", m."ErrorCode", m."ErrorMessage", m."HangfireJobId", m."NextRetryAt", m."OriginalFileName", m."OriginalFilePath", m."ProcessedFilePath", m."ProcessingMode", m."Progress", m."SourceAudioDurationSeconds", m."Stage", m."StartedAt", m."Status", m."UpdatedAt"
+      FROM "MeetingJobs" AS m
+      WHERE m."Id" = @__meetingJobId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (5ms) [Parameters=[@p5='?' (DbType = Guid), @p0='?' (DbType = Int32), @p1='?', @p2='?' (DbType = DateTime), @p3='?', @p4='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      UPDATE "MeetingJobs" SET "AutomaticRetryLimit" = @p0, "Stage" = @p1, "StartedAt" = @p2, "Status" = @p3, "UpdatedAt" = @p4
+      WHERE "Id" = @p5;
+info: MeetingMind.Worker.Jobs.MeetingProcessingJob[0]
+      Meeting processing event for job a507435f-de4e-46bd-a859-13d2f011b1ef; stage Validating; outcome Succeeded; attempt 1; progress 0; elapsed 39 ms
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__meetingJobId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."CreatedAt", m."FormattingConfigurationJson", m."FormattingVersion", m."MeetingJobId", m."ParagraphsJson", m."SegmentsJson", m."TranscriptFilePath", m."TranscriptText"
+      FROM "MeetingTranscripts" AS m
+      WHERE m."MeetingJobId" = @__meetingJobId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__meetingJobId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."AutomaticRetryCount", m."AutomaticRetryLimit", m."CompletedAt", m."CreatedAt", m."ErrorCode", m."ErrorMessage", m."HangfireJobId", m."NextRetryAt", m."OriginalFileName", m."OriginalFilePath", m."ProcessedFilePath", m."ProcessingMode", m."Progress", m."SourceAudioDurationSeconds", m."Stage", m."StartedAt", m."Status", m."UpdatedAt"
+      FROM "MeetingJobs" AS m
+      WHERE m."Id" = @__meetingJobId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (5ms) [Parameters=[@p3='?' (DbType = Guid), @p0='?' (DbType = Int32), @p1='?', @p2='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      UPDATE "MeetingJobs" SET "Progress" = @p0, "Stage" = @p1, "UpdatedAt" = @p2
+      WHERE "Id" = @p3;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__meetingJobId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."AutomaticRetryCount", m."AutomaticRetryLimit", m."CompletedAt", m."CreatedAt", m."ErrorCode", m."ErrorMessage", m."HangfireJobId", m."NextRetryAt", m."OriginalFileName", m."OriginalFilePath", m."ProcessedFilePath", m."ProcessingMode", m."Progress", m."SourceAudioDurationSeconds", m."Stage", m."StartedAt", m."Status", m."UpdatedAt"
+      FROM "MeetingJobs" AS m
+      WHERE m."Id" = @__meetingJobId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (5ms) [Parameters=[@p3='?' (DbType = Guid), @p0='?', @p1='?' (DbType = Int64), @p2='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      UPDATE "MeetingJobs" SET "ProcessedFilePath" = @p0, "SourceAudioDurationSeconds" = @p1, "UpdatedAt" = @p2
+      WHERE "Id" = @p3;
+info: MeetingMind.Worker.Jobs.MeetingProcessingJob[0]
+      Meeting processing event for job a507435f-de4e-46bd-a859-13d2f011b1ef; stage Transcoding; outcome Succeeded; attempt 1; progress 25; elapsed 650 ms
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@__meetingJobId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."AutomaticRetryCount", m."AutomaticRetryLimit", m."CompletedAt", m."CreatedAt", m."ErrorCode", m."ErrorMessage", m."HangfireJobId", m."NextRetryAt", m."OriginalFileName", m."OriginalFilePath", m."ProcessedFilePath", m."ProcessingMode", m."Progress", m."SourceAudioDurationSeconds", m."Stage", m."StartedAt", m."Status", m."UpdatedAt"
+      FROM "MeetingJobs" AS m
+      WHERE m."Id" = @__meetingJobId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (5ms) [Parameters=[@p3='?' (DbType = Guid), @p0='?' (DbType = Int32), @p1='?', @p2='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      UPDATE "MeetingJobs" SET "Progress" = @p0, "Stage" = @p1, "UpdatedAt" = @p2
+      WHERE "Id" = @p3;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@__meetingJobId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."CreatedAt", m."FormattingConfigurationJson", m."FormattingVersion", m."MeetingJobId", m."ParagraphsJson", m."SegmentsJson", m."TranscriptFilePath", m."TranscriptText"
+      FROM "MeetingTranscripts" AS m
+      WHERE m."MeetingJobId" = @__meetingJobId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__meetingJobId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."AutomaticRetryCount", m."AutomaticRetryLimit", m."CompletedAt", m."CreatedAt", m."ErrorCode", m."ErrorMessage", m."HangfireJobId", m."NextRetryAt", m."OriginalFileName", m."OriginalFilePath", m."ProcessedFilePath", m."ProcessingMode", m."Progress", m."SourceAudioDurationSeconds", m."Stage", m."StartedAt", m."Status", m."UpdatedAt"
+      FROM "MeetingJobs" AS m
+      WHERE m."Id" = @__meetingJobId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@p1='?' (DbType = Guid), @p0='?' (DbType = DateTime), @p2='?' (DbType = Guid), @p3='?' (DbType = DateTime), @p4='?', @p5='?', @p6='?' (DbType = Guid), @p7='?', @p8='?', @p9='?', @p10='?'], CommandType='Text', CommandTimeout='30']
+      UPDATE "MeetingJobs" SET "UpdatedAt" = @p0
+      WHERE "Id" = @p1;
+      INSERT INTO "MeetingTranscripts" ("Id", "CreatedAt", "FormattingConfigurationJson", "FormattingVersion", "MeetingJobId", "ParagraphsJson", "SegmentsJson", "TranscriptFilePath", "TranscriptText")
+      VALUES (@p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10);
+info: MeetingMind.Worker.Jobs.MeetingProcessingJob[0]
+      Meeting processing event for job a507435f-de4e-46bd-a859-13d2f011b1ef; stage Transcribing; outcome Succeeded; attempt 1; progress 60; elapsed 26544 ms
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__meetingJobId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT m."Id", m."AutomaticRetryCount", m."AutomaticRetryLimit", m."CompletedAt", m."CreatedAt", m."ErrorCode", m."ErrorMessage", m."HangfireJobId", m."NextRetryAt", m."OriginalFileName", m."OriginalFilePath", m."ProcessedFilePath", m."ProcessingMode", m."Progress", m."SourceAudioDurationSeconds", m."Stage", m."StartedAt", m."Status", m."UpdatedAt"
+      FROM "MeetingJobs" AS m
+      WHERE m."Id" = @__meetingJobId_0
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (10ms) [Parameters=[@p5='?' (DbType = Guid), @p0='?' (DbType = DateTime), @p1='?' (DbType = Int32), @p2='?', @p3='?', @p4='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      UPDATE "MeetingJobs" SET "CompletedAt" = @p0, "Progress" = @p1, "Stage" = @p2, "Status" = @p3, "UpdatedAt" = @p4
+      WHERE "Id" = @p5;
+info: MeetingMind.Worker.Jobs.MeetingProcessingJob[0]
+      Meeting processing event for job a507435f-de4e-46bd-a859-13d2f011b1ef; stage Completed; outcome Succeeded; attempt 1; progress 100; elapsed 27265 ms
+info: Hangfire.Server.ServerWatchdog[0]
+      1 servers were removed due to timeout
+warn: Hangfire.Server.ServerHeartbeatProcess[0]
+      Server business:9080:25ac9329 was considered dead by other servers, restarting...
+info: Hangfire.Server.BackgroundServerProcess[0]
+      Server business:9080:25ac9329 caught restart signal...
+warn: Hangfire.Server.BackgroundServerProcess[0]
+      Server business:9080:25ac9329 stopped non-gracefully due to ServerWatchdog, ServerJobCancellationWatcher, ExpirationManager, CountersAggregator, Worker, DelayedJobScheduler, RecurringJobScheduler. Outstanding work on those dispatchers could be aborted, and there can be delays in background processing. This server instance will be incorrectly shown as active for a while. To avoid non-graceful shutdowns, investigate what prevents from stopping gracefully and add CancellationToken support for those methods.
+info: Hangfire.Server.BackgroundServerProcess[0]
+      Server business:9080:25ac9329 successfully reported itself as stopped in 6.6708 ms
+info: Hangfire.Server.BackgroundServerProcess[0]
+      Server business:9080:25ac9329 has been stopped in total 12.0058 ms
+info: Hangfire.Server.BackgroundServerProcess[0]
+      Server business:9080:b89a5bc9 successfully announced in 19.1724 ms
+info: Hangfire.Server.BackgroundServerProcess[0]
+      Server business:9080:b89a5bc9 is starting the registered dispatchers: ServerWatchdog, ServerJobCancellationWatcher, ExpirationManager, CountersAggregator, Worker, DelayedJobScheduler, RecurringJobScheduler...
+info: Hangfire.Server.BackgroundServerProcess[0]
+      Server business:9080:b89a5bc9 all the dispatchers started
